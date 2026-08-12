@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -35,8 +33,6 @@ fun PlayerBottomControls(
     onSeek: (Long) -> Unit,
     onLockToggle: () -> Unit,
     onSpeedClick: () -> Unit,
-    onSubtitleClick: () -> Unit,
-    onAudioTrackClick: () -> Unit,
     onFullscreenToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -112,22 +108,6 @@ fun PlayerBottomControls(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                    IconButton(onClick = onSubtitleClick) {
-                        Icon(
-                            imageVector = Icons.Filled.ClosedCaption,
-                            contentDescription = "Subtitles",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = onAudioTrackClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Subtitles, // Placeholder for audio track
-                            contentDescription = "Audio Tracks",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
                     IconButton(onClick = onFullscreenToggle) {
                         Icon(
                             imageVector = Icons.Filled.Fullscreen,
@@ -153,3 +133,4 @@ private fun formatTime(timeMs: Long): String {
         String.format("%02d:%02d", minutes, seconds)
     }
 }
+

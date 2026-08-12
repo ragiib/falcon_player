@@ -31,8 +31,6 @@ fun PlayerControls(
     onSeek: (Long) -> Unit,
     onLockToggle: () -> Unit,
     onSpeedClick: () -> Unit,
-    onSubtitleClick: () -> Unit,
-    onAudioTrackClick: () -> Unit,
     onFullscreenToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -70,7 +68,7 @@ fun PlayerControls(
                     PlayerTopBar(
                         title = uiState.mediaInfo.title,
                         onBackClick = onBackClick,
-                        onOverflowClick = onOverflowClick,
+                        onOpenFileClick = onOverflowClick, // Maps to the open file logic
                         modifier = Modifier.padding(top = 24.dp) // Account for status bar
                     )
                 }
@@ -116,8 +114,6 @@ fun PlayerControls(
                         onSeek = onSeek,
                         onLockToggle = onLockToggle,
                         onSpeedClick = onSpeedClick,
-                        onSubtitleClick = onSubtitleClick,
-                        onAudioTrackClick = onAudioTrackClick,
                         onFullscreenToggle = onFullscreenToggle,
                         modifier = Modifier.padding(bottom = 24.dp) // Account for nav bar
                     )
@@ -126,3 +122,4 @@ fun PlayerControls(
         }
     }
 }
+

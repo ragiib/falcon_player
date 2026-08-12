@@ -10,8 +10,8 @@ data class PlayerUiState(
 
 data class MediaInfo(
     val title: String = "Big Buck Bunny - Sample Video",
-    val currentPositionMs: Long = 120000L, // 2 minutes in
-    val durationMs: Long = 596000L, // ~10 minutes
+    val currentPositionMs: Long = 0L,
+    val durationMs: Long = 0L,
     val isLive: Boolean = false
 )
 
