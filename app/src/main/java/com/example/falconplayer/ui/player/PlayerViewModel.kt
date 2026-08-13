@@ -68,6 +68,11 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun updatePlaybackState() {
+        val playerError = player.playerError
+        if (playerError != null) {
+            _uiState.update { it.copy(playbackState = PlaybackState.Error(playerError.message ?: "Unknown error")) }
+            return
+        }
         val newState = when (player.playbackState) {
             Player.STATE_IDLE -> PlaybackState.Idle
             Player.STATE_BUFFERING -> PlaybackState.Buffering

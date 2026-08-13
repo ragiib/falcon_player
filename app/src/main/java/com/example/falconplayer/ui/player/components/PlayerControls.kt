@@ -67,6 +67,7 @@ fun PlayerControls(
                 ) {
                     PlayerTopBar(
                         title = uiState.mediaInfo.title,
+                        playbackState = uiState.playbackState,
                         onBackClick = onBackClick,
                         onOpenFileClick = onOverflowClick, // Maps to the open file logic
                         modifier = Modifier.padding(top = 24.dp) // Account for status bar

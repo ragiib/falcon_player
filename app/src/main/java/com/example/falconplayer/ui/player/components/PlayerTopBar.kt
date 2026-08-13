@@ -18,10 +18,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.falconplayer.ui.player.PlaybackState
 
 @Composable
 fun PlayerTopBar(
     title: String,
+    playbackState: PlaybackState,
     onBackClick: () -> Unit,
     onOpenFileClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -51,7 +53,13 @@ fun PlayerTopBar(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 8.dp, end = 16.dp)
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(start = 8.dp, end = 8.dp)
+            )
+            PlaybackStatusIndicator(
+                playbackState = playbackState,
+                modifier = Modifier.padding(end = 8.dp)
             )
         }
 

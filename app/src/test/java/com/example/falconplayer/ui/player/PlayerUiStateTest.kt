@@ -17,4 +17,14 @@ class PlayerUiStateTest {
         val state = PlayerUiState()
         assertEquals(PlaybackState.Idle, state.playbackState)
     }
+
+    @Test
+    fun playbackState_statusText_returnsExpectedLabels() {
+        assertEquals("Loading", PlaybackState.Buffering.statusText)
+        assertEquals("Playing", PlaybackState.Playing.statusText)
+        assertEquals("Paused", PlaybackState.Paused.statusText)
+        assertEquals("Paused", PlaybackState.Idle.statusText)
+        assertEquals("Paused", PlaybackState.Ended.statusText)
+        assertEquals("Error", PlaybackState.Error("Sample error").statusText)
+    }
 }

@@ -24,6 +24,14 @@ sealed interface PlaybackState {
     data class Error(val message: String) : PlaybackState
 }
 
+val PlaybackState.statusText: String
+    get() = when (this) {
+        PlaybackState.Buffering -> "Loading"
+        PlaybackState.Playing -> "Playing"
+        PlaybackState.Paused, PlaybackState.Idle, PlaybackState.Ended -> "Paused"
+        is PlaybackState.Error -> "Error"
+    }
+
 sealed interface ControlsState {
     object Visible : ControlsState
     object Hidden : ControlsState
