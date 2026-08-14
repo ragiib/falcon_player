@@ -74,7 +74,7 @@ fun PlayerCenterControls(
             modifier = Modifier
                 .size(72.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.2f))
+                .background(com.example.falconplayer.theme.FalconRed)
                 .clickable(onClick = onPlayPauseClick),
             contentAlignment = Alignment.Center
         ) {

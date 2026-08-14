@@ -18,6 +18,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+import androidx.compose.material3.RadioButtonDefaults
+import com.example.falconplayer.theme.FalconRed
+import com.example.falconplayer.theme.FalconSurface
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerSettingsSheet(
@@ -30,6 +34,7 @@ fun PlayerSettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
+        containerColor = FalconSurface,
         modifier = modifier
     ) {
         Column(
@@ -54,7 +59,8 @@ fun PlayerSettingsSheet(
                 ) {
                     RadioButton(
                         selected = currentSpeed == speed,
-                        onClick = null // Handled by Row click
+                        onClick = null,
+                        colors = RadioButtonDefaults.colors(selectedColor = FalconRed)
                     )
                     Text(
                         text = if (speed == 1.0f) "Normal" else "${speed}x",

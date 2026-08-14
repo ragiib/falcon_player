@@ -39,9 +39,9 @@ fun PlaybackStatusIndicator(
 
     val targetDotColor = when (playbackState) {
         PlaybackState.Buffering -> Color(0xFFFFC107) // Amber/Yellow for Loading
-        PlaybackState.Playing -> Color(0xFF4CAF50)   // Green for Playing
+        PlaybackState.Playing -> com.example.falconplayer.theme.FalconRed   // Falcon Red for Playing
         PlaybackState.Paused, PlaybackState.Idle, PlaybackState.Ended -> Color(0xFFB0BEC5) // Neutral Gray for Paused
-        is PlaybackState.Error -> Color(0xFFE53935)  // Red for Error
+        is PlaybackState.Error -> com.example.falconplayer.theme.FalconRed  // Falcon Red for Error
     }
 
     val dotColor by animateColorAsState(

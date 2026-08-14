@@ -42,10 +42,15 @@ import com.example.falconplayer.MainActivity
 import com.example.falconplayer.ui.player.components.PlayerControls
 import com.example.falconplayer.ui.player.components.PlayerSettingsSheet
 
+import androidx.compose.runtime.LaunchedEffect
+import com.example.falconplayer.theme.FalconRed
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     onBackClick: () -> Unit,
+    initialVideoUri: android.net.Uri? = null,
+    initialTitle: String? = null,
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -58,6 +63,12 @@ fun PlayerScreen(
     ) { uri ->
         uri?.let {
             viewModel.loadVideo(it)
+        }
+    }
+
+    LaunchedEffect(initialVideoUri) {
+        if (initialVideoUri != null) {
+            viewModel.loadVideo(initialVideoUri, initialTitle ?: "Video")
         }
     }
 
@@ -86,7 +97,7 @@ fun PlayerScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(color = FalconRed)
             }
         }
 
@@ -101,7 +112,7 @@ fun PlayerScreen(
                 Surface(
                     color = Color.Black.copy(alpha = 0.85f),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.6f))
+                    border = BorderStroke(1.dp, FalconRed.copy(alpha = 0.8f))
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
@@ -110,7 +121,7 @@ fun PlayerScreen(
                         Icon(
                             imageVector = Icons.Filled.Warning,
                             contentDescription = "Error",
-                            tint = Color(0xFFE53935),
+                            tint = FalconRed,
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -183,3 +194,4 @@ fun PlayerScreen(
         }
     }
 }
+

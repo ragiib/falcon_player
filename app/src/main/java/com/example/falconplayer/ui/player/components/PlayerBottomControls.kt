@@ -50,8 +50,8 @@ fun PlayerBottomControls(
                 valueRange = 0f..mediaInfo.durationMs.coerceAtLeast(1L).toFloat(),
                 onValueChange = { onSeek(it.toLong()) },
                 colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = Color.White,
+                    thumbColor = com.example.falconplayer.theme.FalconRed,
+                    activeTrackColor = com.example.falconplayer.theme.FalconRed,
                     inactiveTrackColor = Color.White.copy(alpha = 0.3f)
                 ),
                 modifier = Modifier.fillMaxWidth()
