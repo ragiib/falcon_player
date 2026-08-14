@@ -55,6 +55,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.runtime.ktx)
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.datastore.preferences)
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
   // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)

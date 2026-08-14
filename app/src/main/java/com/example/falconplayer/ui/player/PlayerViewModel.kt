@@ -11,6 +11,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.falconplayer.data.PlaybackPositionRepository
+import com.example.falconplayer.data.PlaylistRepository
+import com.example.falconplayer.data.VideoItem
+import com.example.falconplayer.data.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -26,7 +29,9 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val positionRepository: PlaybackPositionRepository
+    private val positionRepository: PlaybackPositionRepository,
+    private val playlistRepository: PlaylistRepository,
+    private val videoRepository: VideoRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -38,6 +43,9 @@ class PlayerViewModel @Inject constructor(
     private var progressJob: Job? = null
     private var currentUri: String? = null
 
+    private var playlistQueue: List<VideoItem> = emptyList()
+    private var currentQueueIndex: Int = 0
+
     init {
         setupPlayerListeners()
     }
@@ -46,6 +54,13 @@ class PlayerViewModel @Inject constructor(
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 updatePlaybackState()
+                if (playbackState == Player.STATE_ENDED) {
+                    if (playlistQueue.isNotEmpty() && currentQueueIndex < playlistQueue.size - 1) {
+                        currentQueueIndex++
+                        val nextVideo = playlistQueue[currentQueueIndex]
+                        loadVideo(nextVideo.contentUri, nextVideo.title)
+                    }
+                }
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -112,6 +127,23 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    fun loadPlaylistQueue(playlistId: String, startIndex: Int = 0) {
+        viewModelScope.launch {
+            val playlist = playlistRepository.playlists.first().find { it.id == playlistId } ?: return@launch
+            val allVideos = videoRepository.getVideos()
+            val videoMap = allVideos.associateBy { it.contentUri.toString() }
+            val orderedVideos = playlist.videoUris.mapNotNull { uriStr ->
+                videoMap[uriStr] ?: allVideos.find { it.contentUri.toString() == uriStr }
+            }
+            if (orderedVideos.isNotEmpty()) {
+                playlistQueue = orderedVideos
+                currentQueueIndex = startIndex.coerceIn(0, orderedVideos.size - 1)
+                val targetVideo = orderedVideos[currentQueueIndex]
+                loadVideo(targetVideo.contentUri, targetVideo.title)
+            }
+        }
+    }
+
     fun loadVideo(uri: Uri, title: String = uri.lastPathSegment ?: "Unknown Video") {
         val uriString = uri.toString()
         currentUri = uriString
@@ -150,6 +182,28 @@ class PlayerViewModel @Inject constructor(
             player.play()
         }
         onUserActivity()
+    }
+
+    fun onNextClick() {
+        if (playlistQueue.isNotEmpty() && currentQueueIndex < playlistQueue.size - 1) {
+            currentQueueIndex++
+            val nextVideo = playlistQueue[currentQueueIndex]
+            loadVideo(nextVideo.contentUri, nextVideo.title)
+        } else {
+            onForwardClick()
+        }
+    }
+
+    fun onPreviousClick() {
+        if (player.currentPosition > 3000L) {
+            player.seekTo(0L)
+        } else if (playlistQueue.isNotEmpty() && currentQueueIndex > 0) {
+            currentQueueIndex--
+            val prevVideo = playlistQueue[currentQueueIndex]
+            loadVideo(prevVideo.contentUri, prevVideo.title)
+        } else {
+            player.seekTo(0L)
+        }
     }
 
     fun onSeek(positionMs: Long) {

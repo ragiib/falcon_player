@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -32,9 +33,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lock
@@ -46,6 +50,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,6 +82,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.falconplayer.data.FolderItem
+import com.example.falconplayer.data.Playlist
 import com.example.falconplayer.data.VideoItem
 import com.example.falconplayer.theme.FalconBackground
 import com.example.falconplayer.theme.FalconRed
@@ -83,6 +91,11 @@ import com.example.falconplayer.theme.FalconSurfaceVariant
 import com.example.falconplayer.theme.FalconTextPrimary
 import com.example.falconplayer.theme.FalconTextSecondary
 import com.example.falconplayer.ui.components.VideoThumbnailImage
+import com.example.falconplayer.ui.playlist.PlaylistViewModel
+import com.example.falconplayer.ui.playlist.components.AddToPlaylistDialog
+import com.example.falconplayer.ui.playlist.components.CreatePlaylistDialog
+import com.example.falconplayer.ui.playlist.components.DeletePlaylistDialog
+import com.example.falconplayer.ui.playlist.components.RenamePlaylistDialog
 
 sealed interface GridCardItem {
     data class Video(val item: VideoItem) : GridCardItem
@@ -92,13 +105,21 @@ sealed interface GridCardItem {
 @Composable
 fun HomeScreen(
     onPlayMedia: (uri: Uri?, title: String?) -> Unit,
+    onOpenPlaylist: (playlistId: String) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    playlistViewModel: PlaylistViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val playlists by playlistViewModel.playlists.collectAsStateWithLifecycle()
 
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val showCreateDialog by playlistViewModel.showCreateDialog.collectAsStateWithLifecycle()
+    val renameTarget by playlistViewModel.renameTarget.collectAsStateWithLifecycle()
+    val deleteTarget by playlistViewModel.deleteTarget.collectAsStateWithLifecycle()
+    val addToPlaylistVideos by playlistViewModel.addToPlaylistVideos.collectAsStateWithLifecycle()
+
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = VIDEOS, 1 = PLAYLISTS
     var selectedNavIndex by remember { mutableIntStateOf(0) }
 
     val requiredPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -199,6 +220,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .clickable {
                                 selectedTab = 0
+                                selectedNavIndex = 0
                                 viewModel.clearFolderFilter()
                             }
                             .padding(end = 24.dp, bottom = 8.dp),
@@ -227,7 +249,10 @@ fun HomeScreen(
                     // PLAYLISTS Tab
                     Column(
                         modifier = Modifier
-                            .clickable { selectedTab = 1 }
+                            .clickable {
+                                selectedTab = 1
+                                selectedNavIndex = 3
+                            }
                             .padding(end = 24.dp, bottom = 8.dp),
                         horizontalAlignment = Alignment.Start
                     ) {
@@ -252,8 +277,8 @@ fun HomeScreen(
                     }
                 }
 
-                // Folder Filter Header (If a folder is selected)
-                if (uiState.selectedFolderBucketId != null) {
+                // Folder Filter Header (If a folder is selected in Videos tab)
+                if (selectedTab == 0 && uiState.selectedFolderBucketId != null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -293,11 +318,15 @@ fun HomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    val firstVideo = uiState.filteredVideos.firstOrNull() ?: uiState.videos.firstOrNull()
-                    if (firstVideo != null) {
-                        onPlayMedia(firstVideo.contentUri, firstVideo.title)
+                    if (selectedTab == 1) {
+                        playlistViewModel.openCreateDialog()
                     } else {
-                        videoPickerLauncher.launch(arrayOf("video/*"))
+                        val firstVideo = uiState.filteredVideos.firstOrNull() ?: uiState.videos.firstOrNull()
+                        if (firstVideo != null) {
+                            onPlayMedia(firstVideo.contentUri, firstVideo.title)
+                        } else {
+                            videoPickerLauncher.launch(arrayOf("video/*"))
+                        }
                     }
                 },
                 containerColor = FalconRed,
@@ -306,8 +335,8 @@ fun HomeScreen(
                 modifier = Modifier.padding(bottom = 8.dp, end = 8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play Media",
+                    imageVector = if (selectedTab == 1) Icons.Default.Add else Icons.Default.PlayArrow,
+                    contentDescription = if (selectedTab == 1) "Create Playlist" else "Play Media",
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -330,7 +359,14 @@ fun HomeScreen(
                     val isSelected = selectedNavIndex == index
                     NavigationBarItem(
                         selected = isSelected,
-                        onClick = { selectedNavIndex = index },
+                        onClick = {
+                            selectedNavIndex = index
+                            if (index == 0) {
+                                selectedTab = 0
+                            } else if (index == 3) {
+                                selectedTab = 1
+                            }
+                        },
                         icon = {
                             Icon(
                                 imageVector = icon,
@@ -411,6 +447,77 @@ fun HomeScreen(
                     }
                 }
 
+                // VIEWPORT FOR PLAYLISTS TAB
+                selectedTab == 1 -> {
+                    if (playlists.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                                contentDescription = "No Playlists",
+                                tint = FalconTextSecondary,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No Playlists Yet",
+                                color = FalconTextPrimary,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Create custom playlists to organize your favorite video clips.",
+                                color = FalconTextSecondary,
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = { playlistViewModel.openCreateDialog() },
+                                colors = ButtonDefaults.buttonColors(containerColor = FalconRed)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(text = "Create Playlist", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            contentPadding = PaddingValues(
+                                start = 12.dp,
+                                end = 12.dp,
+                                top = 12.dp,
+                                bottom = 80.dp
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(playlists, key = { it.id }) { playlist ->
+                                RealPlaylistCard(
+                                    playlist = playlist,
+                                    allVideos = uiState.videos,
+                                    onClick = { onOpenPlaylist(playlist.id) },
+                                    onRename = { playlistViewModel.openRenameDialog(playlist) },
+                                    onDelete = { playlistViewModel.openDeleteDialog(playlist) }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // State 3: Empty Video List
                 uiState.videos.isEmpty() -> {
                     Column(
@@ -454,10 +561,8 @@ fun HomeScreen(
                 else -> {
                     val gridItems: List<GridCardItem> = remember(uiState) {
                         if (uiState.selectedFolderBucketId != null) {
-                            // If filtering by folder, display that folder's videos
                             uiState.filteredVideos.map { GridCardItem.Video(it) }
                         } else {
-                            // Display top folders first, then individual videos
                             val folderCards = uiState.folders.map { GridCardItem.Folder(it) }
                             val videoCards = uiState.videos.map { GridCardItem.Video(it) }
                             folderCards + videoCards
@@ -486,7 +591,8 @@ fun HomeScreen(
                                 is GridCardItem.Video -> {
                                     RealVideoCard(
                                         video = item.item,
-                                        onClick = { onPlayMedia(item.item.contentUri, item.item.title) }
+                                        onClick = { onPlayMedia(item.item.contentUri, item.item.title) },
+                                        onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(item.item)) }
                                     )
                                 }
 
@@ -503,20 +609,63 @@ fun HomeScreen(
             }
         }
     }
+
+    // DIALOGS
+    if (showCreateDialog) {
+        CreatePlaylistDialog(
+            onDismiss = playlistViewModel::closeCreateDialog,
+            onCreate = { name -> playlistViewModel.createPlaylist(name) }
+        )
+    }
+
+    renameTarget?.let { target ->
+        RenamePlaylistDialog(
+            initialName = target.name,
+            onDismiss = playlistViewModel::closeRenameDialog,
+            onRename = { newName -> playlistViewModel.renamePlaylist(target.id, newName) }
+        )
+    }
+
+    deleteTarget?.let { target ->
+        DeletePlaylistDialog(
+            playlistName = target.name,
+            onDismiss = playlistViewModel::closeDeleteDialog,
+            onConfirmDelete = { playlistViewModel.deletePlaylist(target.id) }
+        )
+    }
+
+    if (addToPlaylistVideos.isNotEmpty()) {
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onDismiss = playlistViewModel::closeAddToPlaylistDialog,
+            onSelectPlaylist = { playlistId ->
+                val target = playlists.find { it.id == playlistId }
+                playlistViewModel.addVideosToPlaylist(playlistId, addToPlaylistVideos)
+                Toast.makeText(context, "Added to ${target?.name ?: "Playlist"}", Toast.LENGTH_SHORT).show()
+            },
+            onCreateNewPlaylist = {
+                val videosToPass = addToPlaylistVideos
+                playlistViewModel.closeAddToPlaylistDialog()
+                playlistViewModel.openCreateDialog()
+            }
+        )
+    }
 }
 
 @Composable
 fun RealVideoCard(
     video: VideoItem,
     onClick: () -> Unit,
+    onAddToPlaylist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        // Real Video Thumbnail Container
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -524,14 +673,12 @@ fun RealVideoCard(
                 .clip(RoundedCornerShape(8.dp))
                 .background(FalconSurface)
         ) {
-            // Asynchronous Real Thumbnail Image
             VideoThumbnailImage(
                 videoUri = video.contentUri,
                 contentDescription = video.title,
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Top Left Resolution Badge (e.g. 1080p, 4K, 720p)
             video.resolutionBadge?.let { badgeText ->
                 Box(
                     modifier = Modifier
@@ -554,19 +701,44 @@ fun RealVideoCard(
                 modifier = Modifier
                     .padding(4.dp)
                     .align(Alignment.TopEnd)
-                    .size(24.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape),
-                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Item Menu",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .clickable { showMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Item Menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(FalconSurface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Add to Playlist", color = FalconTextPrimary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = null,
+                                tint = FalconRed
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onAddToPlaylist()
+                        }
+                    )
+                }
             }
 
-            // Bottom Left Duration Badge
             Box(
                 modifier = Modifier
                     .padding(6.dp)
@@ -585,7 +757,6 @@ fun RealVideoCard(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Real Video Title
         Text(
             text = video.title,
             color = FalconTextPrimary,
@@ -595,9 +766,165 @@ fun RealVideoCard(
             overflow = TextOverflow.Ellipsis
         )
 
-        // Duration Subtext
         Text(
             text = video.durationFormatted,
+            color = FalconTextSecondary,
+            fontSize = 12.sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+fun RealPlaylistCard(
+    playlist: Playlist,
+    allVideos: List<VideoItem>,
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    val videoMap = remember(allVideos) { allVideos.associateBy { it.contentUri.toString() } }
+    val previewVideos = remember(playlist, videoMap) {
+        playlist.videoUris.take(4).mapNotNull { videoMap[it] }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.6f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(FalconSurface)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF2A2A2A))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        previewVideos.getOrNull(0)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF333333))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        previewVideos.getOrNull(1)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                }
+                Row(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF222222))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        previewVideos.getOrNull(2)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF1F1F1F))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        previewVideos.getOrNull(3)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                }
+            }
+
+            // Top Right 3-dots Menu Button
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .clickable { showMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Playlist Menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(FalconSurface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Rename", color = FalconTextPrimary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                tint = FalconRed
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onRename()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete", color = FalconRed) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = FalconRed
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = playlist.name,
+            color = FalconTextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Text(
+            text = "${playlist.videoUris.size} video${if (playlist.videoUris.size != 1) "s" else ""}",
             color = FalconTextSecondary,
             fontSize = 12.sp,
             maxLines = 1
@@ -616,7 +943,6 @@ fun RealFolderCard(
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        // Composite Folder Thumbnail Container
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -624,7 +950,6 @@ fun RealFolderCard(
                 .clip(RoundedCornerShape(8.dp))
                 .background(FalconSurface)
         ) {
-            // 2x2 Thumbnail Grid for Folder Preview
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(modifier = Modifier.weight(1f)) {
                     Box(
@@ -676,7 +1001,6 @@ fun RealFolderCard(
                 }
             }
 
-            // Top Right 3-dots Menu Button
             Box(
                 modifier = Modifier
                     .padding(4.dp)
@@ -696,7 +1020,6 @@ fun RealFolderCard(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Folder Title
         Text(
             text = folder.bucketName,
             color = FalconTextPrimary,
@@ -706,7 +1029,6 @@ fun RealFolderCard(
             overflow = TextOverflow.Ellipsis
         )
 
-        // Real Video Count Subtext
         Text(
             text = "${folder.videoCount} video${if (folder.videoCount > 1) "s" else ""}",
             color = FalconTextSecondary,

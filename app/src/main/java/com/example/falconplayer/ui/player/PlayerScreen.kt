@@ -51,6 +51,8 @@ fun PlayerScreen(
     onBackClick: () -> Unit,
     initialVideoUri: android.net.Uri? = null,
     initialTitle: String? = null,
+    initialPlaylistId: String? = null,
+    initialPlaylistIndex: Int = 0,
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
@@ -66,8 +68,10 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(initialVideoUri) {
-        if (initialVideoUri != null) {
+    LaunchedEffect(initialVideoUri, initialPlaylistId, initialPlaylistIndex) {
+        if (initialPlaylistId != null) {
+            viewModel.loadPlaylistQueue(initialPlaylistId, initialPlaylistIndex)
+        } else if (initialVideoUri != null) {
             viewModel.loadVideo(initialVideoUri, initialTitle ?: "Video")
         }
     }
@@ -160,8 +164,8 @@ fun PlayerScreen(
             onBackClick = onBackClick,
             onOverflowClick = { videoPickerLauncher.launch(arrayOf("video/*")) }, // Reusing overflow as open file
             onPlayPauseClick = viewModel::onPlayPauseClick,
-            onPreviousClick = { /* No-op or skip backward */ },
-            onNextClick = { /* No-op or skip forward */ },
+            onPreviousClick = viewModel::onPreviousClick,
+            onNextClick = viewModel::onNextClick,
             onRewindClick = viewModel::onRewindClick,
             onForwardClick = viewModel::onForwardClick,
             onSeek = viewModel::onSeek,
