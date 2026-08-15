@@ -31,7 +31,8 @@ class VideoRepository @Inject constructor(
             MediaStore.Video.Media.SIZE,
             MediaStore.Video.Media.BUCKET_ID,
             MediaStore.Video.Media.BUCKET_DISPLAY_NAME,
-            MediaStore.Video.Media.DATA
+            MediaStore.Video.Media.DATA,
+            MediaStore.Video.Media.DATE_ADDED
         )
 
         try {
@@ -54,6 +55,7 @@ class VideoRepository @Inject constructor(
                 val bucketIdCol = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_ID)
                 val bucketNameCol = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
                 val dataCol = cursor.getColumnIndex(MediaStore.Video.Media.DATA)
+                val dateAddedCol = cursor.getColumnIndex(MediaStore.Video.Media.DATE_ADDED)
 
                 while (cursor.moveToNext()) {
                     val id = if (idCol >= 0) cursor.getLong(idCol) else continue
@@ -66,6 +68,7 @@ class VideoRepository @Inject constructor(
                     val width = if (widthCol >= 0) cursor.getInt(widthCol) else 0
                     val height = if (heightCol >= 0) cursor.getInt(heightCol) else 0
                     val size = if (sizeCol >= 0) cursor.getLong(sizeCol) else 0L
+                    val dateAddedSec = if (dateAddedCol >= 0) cursor.getLong(dateAddedCol) else 0L
 
                     val rawBucketId = if (bucketIdCol >= 0) cursor.getString(bucketIdCol) else null
                     val rawBucketName = if (bucketNameCol >= 0) cursor.getString(bucketNameCol) else null
@@ -92,6 +95,7 @@ class VideoRepository @Inject constructor(
                             sizeBytes = size,
                             bucketId = bucketId,
                             bucketName = bucketName,
+                            dateAddedSec = dateAddedSec,
                             resolutionBadge = resolutionBadge
                         )
                     )

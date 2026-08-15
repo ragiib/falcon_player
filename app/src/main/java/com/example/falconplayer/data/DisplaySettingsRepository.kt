@@ -31,7 +31,8 @@ enum class SortType {
     ADDED_DESC,
     TRACKS_DESC,
     TRACKS_ASC,
-    INSERTION_ASC
+    INSERTION_ASC,
+    INSERTION_DESC
 }
 
 @Serializable

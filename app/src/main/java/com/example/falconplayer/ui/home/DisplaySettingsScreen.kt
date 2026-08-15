@@ -347,7 +347,8 @@ fun DisplaySettingsScreen(
                 icon = Icons.Default.CalendarToday,
                 title = "Insertion date",
                 options = listOf(
-                    "Oldest first" to SortType.INSERTION_ASC
+                    "Oldest first" to SortType.INSERTION_ASC,
+                    "Newest first" to SortType.INSERTION_DESC
                 ),
                 currentSort = sortType,
                 onSelectSort = onSelectSortType

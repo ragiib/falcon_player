@@ -852,8 +852,8 @@ fun HomeScreen(
                         if (uiState.selectedFolderBucketId != null) {
                             uiState.filteredVideos.map { GridCardItem.Video(it) }
                         } else {
-                            val folderCards = uiState.folders.map { GridCardItem.Folder(it) }
-                            val videoCards = uiState.videos.map { GridCardItem.Video(it) }
+                            val folderCards = uiState.sortedFolders.map { GridCardItem.Folder(it) }
+                            val videoCards = uiState.filteredVideos.map { GridCardItem.Video(it) }
                             folderCards + videoCards
                         }
                     }

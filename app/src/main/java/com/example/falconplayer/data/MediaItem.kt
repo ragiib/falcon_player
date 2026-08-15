@@ -12,6 +12,7 @@ data class VideoItem(
     val sizeBytes: Long,
     val bucketId: String,
     val bucketName: String,
+    val dateAddedSec: Long = 0L,
     val resolutionBadge: String? = null,
     val durationFormatted: String = formatDuration(durationMs)
 )

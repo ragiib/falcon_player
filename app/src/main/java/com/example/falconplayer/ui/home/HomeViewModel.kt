@@ -61,14 +61,30 @@ data class HomeUiState(
                 baseList
             }
 
+            val folderCounts = folders.associate { it.bucketId to it.videoCount }
+
             return when (sortType) {
                 SortType.NAME_ASC -> favFiltered.sortedBy { it.title.lowercase() }
                 SortType.NAME_DESC -> favFiltered.sortedByDescending { it.title.lowercase() }
                 SortType.LENGTH_ASC -> favFiltered.sortedBy { it.durationMs }
                 SortType.LENGTH_DESC -> favFiltered.sortedByDescending { it.durationMs }
-                SortType.ADDED_ASC, SortType.INSERTION_ASC -> favFiltered.sortedBy { it.id }
-                SortType.ADDED_DESC -> favFiltered.sortedByDescending { it.id }
-                SortType.TRACKS_DESC, SortType.TRACKS_ASC -> favFiltered
+                SortType.ADDED_ASC, SortType.INSERTION_ASC -> favFiltered.sortedBy { if (it.dateAddedSec > 0) it.dateAddedSec else it.id }
+                SortType.ADDED_DESC, SortType.INSERTION_DESC -> favFiltered.sortedByDescending { if (it.dateAddedSec > 0) it.dateAddedSec else it.id }
+                SortType.TRACKS_DESC -> favFiltered.sortedByDescending { folderCounts[it.bucketId] ?: 0 }
+                SortType.TRACKS_ASC -> favFiltered.sortedBy { folderCounts[it.bucketId] ?: 0 }
+            }
+        }
+
+    val sortedFolders: List<FolderItem>
+        get() {
+            return when (sortType) {
+                SortType.NAME_ASC -> folders.sortedBy { it.bucketName.lowercase() }
+                SortType.NAME_DESC -> folders.sortedByDescending { it.bucketName.lowercase() }
+                SortType.TRACKS_DESC -> folders.sortedByDescending { it.videoCount }
+                SortType.TRACKS_ASC -> folders.sortedBy { it.videoCount }
+                SortType.ADDED_DESC, SortType.INSERTION_DESC -> folders.sortedByDescending { f -> f.previewVideos.maxOfOrNull { it.dateAddedSec } ?: 0L }
+                SortType.ADDED_ASC, SortType.INSERTION_ASC -> folders.sortedBy { f -> f.previewVideos.minOfOrNull { it.dateAddedSec } ?: 0L }
+                else -> folders
             }
         }
 }
