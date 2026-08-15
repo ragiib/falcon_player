@@ -151,8 +151,12 @@ fun HomeScreen(
 
     val focusRequester = remember { FocusRequester() }
 
-    BackHandler(enabled = uiState.isSearching) {
-        viewModel.closeSearch()
+    BackHandler(enabled = uiState.isSearching || uiState.isHistoryActive) {
+        if (uiState.isSearching) {
+            viewModel.closeSearch()
+        } else if (uiState.isHistoryActive) {
+            viewModel.closeHistory()
+        }
     }
 
     LaunchedEffect(uiState.isSearching) {
@@ -233,6 +237,29 @@ fun HomeScreen(
                                 .focusRequester(focusRequester)
                         )
                     }
+                } else if (uiState.isHistoryActive) {
+                    // History Top Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { viewModel.closeHistory() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back to Videos",
+                                tint = FalconTextPrimary
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "History",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = FalconTextPrimary
+                        )
+                    }
                 } else {
                     // Top App Bar
                     Row(
@@ -265,7 +292,7 @@ fun HomeScreen(
                                     tint = FalconTextPrimary
                                 )
                             }
-                            IconButton(onClick = { }) {
+                            IconButton(onClick = { viewModel.openHistory() }) {
                                 Icon(
                                     imageVector = Icons.Default.History,
                                     contentDescription = "History",
@@ -576,6 +603,65 @@ fun HomeScreen(
                             RealVideoCard(
                                 video = video,
                                 onClick = { onPlayMedia(video.contentUri, video.title) },
+                                onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) }
+                            )
+                        }
+                    }
+                }
+
+                // State 5: History Active - Empty State
+                uiState.isHistoryActive && uiState.historyVideos.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "No Watch History",
+                            tint = FalconTextSecondary,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No Watch History",
+                            color = FalconTextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Videos you play will appear here.",
+                            color = FalconTextSecondary,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // State 6: History Active - History List
+                uiState.isHistoryActive -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        contentPadding = PaddingValues(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = 12.dp,
+                            bottom = 80.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.historyVideos, key = { "history_video_${it.id}" }) { video ->
+                            RealVideoCard(
+                                video = video,
+                                onClick = {
+                                    viewModel.recordVideoPlayed(video.contentUri.toString())
+                                    onPlayMedia(video.contentUri, video.title)
+                                },
                                 onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) }
                             )
                         }

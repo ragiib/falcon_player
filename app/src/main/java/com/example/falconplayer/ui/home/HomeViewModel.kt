@@ -1,8 +1,10 @@
 package com.example.falconplayer.ui.home
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.falconplayer.data.FolderItem
+import com.example.falconplayer.data.HistoryRepository
 import com.example.falconplayer.data.VideoItem
 import com.example.falconplayer.data.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,7 +23,9 @@ data class HomeUiState(
     val selectedFolderBucketId: String? = null,
     val selectedFolderName: String? = null,
     val isSearching: Boolean = false,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val isHistoryActive: Boolean = false,
+    val historyVideos: List<VideoItem> = emptyList()
 ) {
     val filteredVideos: List<VideoItem>
         get() = when {
@@ -41,11 +45,47 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val videoRepository: VideoRepository
+    private val videoRepository: VideoRepository,
+    private val historyRepository: HistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        observeHistory()
+    }
+
+    private fun observeHistory() {
+        viewModelScope.launch {
+            historyRepository.historyUris.collect { uris ->
+                updateHistoryVideos(uris, _uiState.value.videos)
+            }
+        }
+    }
+
+    private fun updateHistoryVideos(uris: List<String>, allVideos: List<VideoItem>) {
+        val videoMap = allVideos.associateBy { it.contentUri.toString() }
+        val mapped = uris.mapNotNull { uriStr ->
+            videoMap[uriStr] ?: try {
+                val uri = Uri.parse(uriStr)
+                VideoItem(
+                    id = uriStr.hashCode().toLong(),
+                    contentUri = uri,
+                    title = uri.lastPathSegment ?: "Video",
+                    durationMs = 0L,
+                    width = 0,
+                    height = 0,
+                    sizeBytes = 0L,
+                    bucketId = "history",
+                    bucketName = "History"
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+        _uiState.update { it.copy(historyVideos = mapped) }
+    }
 
     fun onPermissionResult(isGranted: Boolean) {
         _uiState.update { it.copy(hasPermission = isGranted) }
@@ -68,6 +108,7 @@ class HomeViewModel @Inject constructor(
                         folders = scannedFolders
                     )
                 }
+                updateHistoryVideos(historyRepository.historyUris.value, scannedVideos)
             } catch (e: Exception) {
                 e.printStackTrace()
                 _uiState.update { it.copy(isLoading = false) }
@@ -97,6 +138,7 @@ class HomeViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isSearching = true,
+                isHistoryActive = false,
                 searchQuery = ""
             )
         }
@@ -108,6 +150,28 @@ class HomeViewModel @Inject constructor(
                 isSearching = false,
                 searchQuery = ""
             )
+        }
+    }
+
+    fun openHistory() {
+        _uiState.update {
+            it.copy(
+                isHistoryActive = true,
+                isSearching = false,
+                searchQuery = ""
+            )
+        }
+    }
+
+    fun closeHistory() {
+        _uiState.update {
+            it.copy(isHistoryActive = false)
+        }
+    }
+
+    fun recordVideoPlayed(uriStr: String) {
+        viewModelScope.launch {
+            historyRepository.recordVideoPlayed(uriStr)
         }
     }
 

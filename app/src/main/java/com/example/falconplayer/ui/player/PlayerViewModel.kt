@@ -10,6 +10,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.falconplayer.data.HistoryRepository
 import com.example.falconplayer.data.PlaybackPositionRepository
 import com.example.falconplayer.data.PlaylistRepository
 import com.example.falconplayer.data.VideoItem
@@ -31,7 +32,8 @@ class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val positionRepository: PlaybackPositionRepository,
     private val playlistRepository: PlaylistRepository,
-    private val videoRepository: VideoRepository
+    private val videoRepository: VideoRepository,
+    private val historyRepository: HistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -156,6 +158,7 @@ class PlayerViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            historyRepository.recordVideoPlayed(uriString)
             val mediaItem = MediaItem.fromUri(uri)
             player.setMediaItem(mediaItem)
             player.prepare()
