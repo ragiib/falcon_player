@@ -205,11 +205,12 @@ fun HomeScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = FalconBackground,
         topBar = {
-            Column(
-                modifier = Modifier
-                    .background(FalconBackground)
-                    .statusBarsPadding()
-            ) {
+            if (selectedNavIndex == 0) {
+                Column(
+                    modifier = Modifier
+                        .background(FalconBackground)
+                        .statusBarsPadding()
+                ) {
                 if (uiState.isSearching) {
                     // Search Bar
                     Row(
@@ -488,31 +489,34 @@ fun HomeScreen(
                     }
                 }
             }
-        },
+        }
+    },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    if (selectedTab == 1) {
-                        playlistViewModel.openCreateDialog()
-                    } else {
-                        val firstVideo = uiState.filteredVideos.firstOrNull() ?: uiState.videos.firstOrNull()
-                        if (firstVideo != null) {
-                            onPlayMedia(firstVideo.contentUri, firstVideo.title)
+            if (selectedNavIndex == 0) {
+                FloatingActionButton(
+                    onClick = {
+                        if (selectedTab == 1) {
+                            playlistViewModel.openCreateDialog()
                         } else {
-                            videoPickerLauncher.launch(arrayOf("video/*"))
+                            val firstVideo = uiState.filteredVideos.firstOrNull() ?: uiState.videos.firstOrNull()
+                            if (firstVideo != null) {
+                                onPlayMedia(firstVideo.contentUri, firstVideo.title)
+                            } else {
+                                videoPickerLauncher.launch(arrayOf("video/*"))
+                            }
                         }
-                    }
-                },
-                containerColor = FalconRed,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.padding(bottom = 8.dp, end = 8.dp)
-            ) {
-                Icon(
-                    imageVector = if (selectedTab == 1) Icons.Default.Add else Icons.Default.PlayArrow,
-                    contentDescription = if (selectedTab == 1) "Create Playlist" else "Play Media",
-                    modifier = Modifier.size(32.dp)
-                )
+                    },
+                    containerColor = FalconRed,
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    modifier = Modifier.padding(bottom = 8.dp, end = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (selectedTab == 1) Icons.Default.Add else Icons.Default.PlayArrow,
+                        contentDescription = if (selectedTab == 1) "Create Playlist" else "Play Media",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
         },
         bottomBar = {

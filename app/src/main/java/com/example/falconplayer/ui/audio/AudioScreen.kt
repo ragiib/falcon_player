@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -81,7 +82,6 @@ import com.example.falconplayer.theme.FalconRed
 import com.example.falconplayer.theme.FalconSurface
 import com.example.falconplayer.theme.FalconTextPrimary
 import com.example.falconplayer.theme.FalconTextSecondary
-import com.example.falconplayer.ui.home.FalconLogoIcon
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -179,9 +179,9 @@ fun AudioScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
                 .background(FalconBackground)
-                .padding(horizontal = 16.dp),
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (uiState.isSearching) {
@@ -212,7 +212,7 @@ fun AudioScreen(
                 AudioLogoIcon(modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "VLC",
+                    text = "Falcon",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FalconTextPrimary
