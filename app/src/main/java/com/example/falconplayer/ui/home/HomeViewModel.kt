@@ -19,13 +19,23 @@ data class HomeUiState(
     val videos: List<VideoItem> = emptyList(),
     val folders: List<FolderItem> = emptyList(),
     val selectedFolderBucketId: String? = null,
-    val selectedFolderName: String? = null
+    val selectedFolderName: String? = null,
+    val isSearching: Boolean = false,
+    val searchQuery: String = ""
 ) {
     val filteredVideos: List<VideoItem>
-        get() = if (selectedFolderBucketId == null) {
-            videos
-        } else {
-            videos.filter { it.bucketId == selectedFolderBucketId }
+        get() = when {
+            isSearching -> {
+                if (searchQuery.isBlank()) {
+                    videos
+                } else {
+                    videos.filter { it.title.contains(searchQuery, ignoreCase = true) }
+                }
+            }
+            selectedFolderBucketId != null -> {
+                videos.filter { it.bucketId == selectedFolderBucketId }
+            }
+            else -> videos
         }
 }
 
@@ -80,6 +90,30 @@ class HomeViewModel @Inject constructor(
                 selectedFolderBucketId = null,
                 selectedFolderName = null
             )
+        }
+    }
+
+    fun openSearch() {
+        _uiState.update {
+            it.copy(
+                isSearching = true,
+                searchQuery = ""
+            )
+        }
+    }
+
+    fun closeSearch() {
+        _uiState.update {
+            it.copy(
+                isSearching = false,
+                searchQuery = ""
+            )
+        }
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _uiState.update {
+            it.copy(searchQuery = query)
         }
     }
 }

@@ -31,12 +31,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +63,10 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -142,6 +149,18 @@ fun HomeScreen(
         }
     }
 
+    val focusRequester = remember { FocusRequester() }
+
+    BackHandler(enabled = uiState.isSearching) {
+        viewModel.closeSearch()
+    }
+
+    LaunchedEffect(uiState.isSearching) {
+        if (uiState.isSearching) {
+            focusRequester.requestFocus()
+        }
+    }
+
     LaunchedEffect(Unit) {
         val permissionCheck = ContextCompat.checkSelfPermission(context, requiredPermission)
         if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
@@ -160,157 +179,213 @@ fun HomeScreen(
                     .background(FalconBackground)
                     .statusBarsPadding()
             ) {
-                // Top App Bar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FalconLogoIcon(modifier = Modifier.size(32.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Falcon",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = FalconTextPrimary
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { }) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
-                                tint = FalconTextPrimary
-                            )
-                        }
-                        IconButton(onClick = { }) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = "History",
-                                tint = FalconTextPrimary
-                            )
-                        }
-                        IconButton(onClick = { videoPickerLauncher.launch(arrayOf("video/*")) }) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Options",
-                                tint = FalconTextPrimary
-                            )
-                        }
-                    }
-                }
-
-                // Tab Header: VIDEOS / PLAYLISTS
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.Start
-                ) {
-                    // VIDEOS Tab
-                    Column(
-                        modifier = Modifier
-                            .clickable {
-                                selectedTab = 0
-                                selectedNavIndex = 0
-                                viewModel.clearFolderFilter()
-                            }
-                            .padding(end = 24.dp, bottom = 8.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Text(
-                            text = "VIDEOS",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (selectedTab == 0) FalconRed else FalconTextSecondary,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        if (selectedTab == 0) {
-                            Box(
-                                modifier = Modifier
-                                    .width(64.dp)
-                                    .height(3.dp)
-                                    .background(FalconRed, shape = RoundedCornerShape(2.dp))
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.height(3.dp))
-                        }
-                    }
-
-                    // PLAYLISTS Tab
-                    Column(
-                        modifier = Modifier
-                            .clickable {
-                                selectedTab = 1
-                                selectedNavIndex = 3
-                            }
-                            .padding(end = 24.dp, bottom = 8.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Text(
-                            text = "PLAYLISTS",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (selectedTab == 1) FalconRed else FalconTextSecondary,
-                            letterSpacing = 0.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        if (selectedTab == 1) {
-                            Box(
-                                modifier = Modifier
-                                    .width(78.dp)
-                                    .height(3.dp)
-                                    .background(FalconRed, shape = RoundedCornerShape(2.dp))
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.height(3.dp))
-                        }
-                    }
-                }
-
-                // Folder Filter Header (If a folder is selected in Videos tab)
-                if (selectedTab == 0 && uiState.selectedFolderBucketId != null) {
+                if (uiState.isSearching) {
+                    // Search Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(FalconSurface)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = { viewModel.clearFolderFilter() },
-                            modifier = Modifier.size(32.dp)
-                        ) {
+                        IconButton(onClick = { viewModel.closeSearch() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back to all videos",
-                                tint = FalconRed
+                                contentDescription = "Close Search",
+                                tint = FalconTextPrimary
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = uiState.selectedFolderName ?: "Folder",
-                            color = FalconTextPrimary,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                        Spacer(modifier = Modifier.width(4.dp))
+                        TextField(
+                            value = uiState.searchQuery,
+                            onValueChange = { viewModel.onSearchQueryChange(it) },
+                            placeholder = {
+                                Text(
+                                    text = "Search videos...",
+                                    color = FalconTextSecondary,
+                                    fontSize = 16.sp
+                                )
+                            },
+                            singleLine = true,
+                            trailingIcon = {
+                                if (uiState.searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear search",
+                                            tint = FalconTextSecondary
+                                        )
+                                    }
+                                }
+                            },
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = FalconSurface,
+                                unfocusedContainerColor = FalconSurface,
+                                focusedTextColor = FalconTextPrimary,
+                                unfocusedTextColor = FalconTextPrimary,
+                                cursorColor = FalconRed,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .focusRequester(focusRequester)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "(${uiState.filteredVideos.size} videos)",
-                            color = FalconTextSecondary,
-                            fontSize = 13.sp
-                        )
+                    }
+                } else {
+                    // Top App Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FalconLogoIcon(modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Falcon",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = FalconTextPrimary
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { viewModel.openSearch() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = FalconTextPrimary
+                                )
+                            }
+                            IconButton(onClick = { }) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = "History",
+                                    tint = FalconTextPrimary
+                                )
+                            }
+                            IconButton(onClick = { videoPickerLauncher.launch(arrayOf("video/*")) }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "Options",
+                                    tint = FalconTextPrimary
+                                )
+                            }
+                        }
+                    }
+
+                    // Tab Header: VIDEOS / PLAYLISTS
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        // VIDEOS Tab
+                        Column(
+                            modifier = Modifier
+                                .clickable {
+                                    selectedTab = 0
+                                    selectedNavIndex = 0
+                                    viewModel.clearFolderFilter()
+                                }
+                                .padding(end = 24.dp, bottom = 8.dp),
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Text(
+                                text = "VIDEOS",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedTab == 0) FalconRed else FalconTextSecondary,
+                                letterSpacing = 0.5.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            if (selectedTab == 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(64.dp)
+                                        .height(3.dp)
+                                        .background(FalconRed, shape = RoundedCornerShape(2.dp))
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.height(3.dp))
+                            }
+                        }
+
+                        // PLAYLISTS Tab
+                        Column(
+                            modifier = Modifier
+                                .clickable {
+                                    selectedTab = 1
+                                    selectedNavIndex = 3
+                                }
+                                .padding(end = 24.dp, bottom = 8.dp),
+                            horizontalAlignment = Alignment.Start
+                        ) {
+                            Text(
+                                text = "PLAYLISTS",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedTab == 1) FalconRed else FalconTextSecondary,
+                                letterSpacing = 0.5.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            if (selectedTab == 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(78.dp)
+                                        .height(3.dp)
+                                        .background(FalconRed, shape = RoundedCornerShape(2.dp))
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.height(3.dp))
+                            }
+                        }
+                    }
+
+                    // Folder Filter Header (If a folder is selected in Videos tab)
+                    if (selectedTab == 0 && uiState.selectedFolderBucketId != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(FalconSurface)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.clearFolderFilter() },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back to all videos",
+                                    tint = FalconRed
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = uiState.selectedFolderName ?: "Folder",
+                                color = FalconTextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "(${uiState.filteredVideos.size} videos)",
+                                color = FalconTextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
             }
@@ -444,6 +519,66 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = FalconRed)
+                    }
+                }
+
+                // State 3: Search Active - No Results
+                uiState.isSearching && uiState.filteredVideos.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SearchOff,
+                            contentDescription = "No Results",
+                            tint = FalconTextSecondary,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "No results found",
+                            color = FalconTextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (uiState.searchQuery.isBlank()) {
+                                "Type to search your video files."
+                            } else {
+                                "No videos found matching \"${uiState.searchQuery}\""
+                            },
+                            color = FalconTextSecondary,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // State 4: Search Active - Matching Videos List
+                uiState.isSearching -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        contentPadding = PaddingValues(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = 12.dp,
+                            bottom = 80.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.filteredVideos, key = { "search_video_${it.id}" }) { video ->
+                            RealVideoCard(
+                                video = video,
+                                onClick = { onPlayMedia(video.contentUri, video.title) },
+                                onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) }
+                            )
+                        }
                     }
                 }
 
