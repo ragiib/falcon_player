@@ -899,10 +899,17 @@ fun HomeScreen(
                                 }
 
                                 is GridCardItem.Folder -> {
-                                    RealFolderCard(
-                                        folder = item.item,
-                                        onClick = { viewModel.selectFolder(item.item.bucketId, item.item.bucketName) }
-                                    )
+                                    if (uiState.isListView) {
+                                        RealFolderListCard(
+                                            folder = item.item,
+                                            onClick = { viewModel.selectFolder(item.item.bucketId, item.item.bucketName) }
+                                        )
+                                    } else {
+                                        RealFolderCard(
+                                            folder = item.item,
+                                            onClick = { viewModel.selectFolder(item.item.bucketId, item.item.bucketName) }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1107,18 +1114,26 @@ fun RealVideoListCard(
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
+    val subtitle = remember(video) {
+        if (!video.resolutionBadge.isNullOrBlank()) {
+            "${video.durationFormatted} • ${video.resolutionBadge}"
+        } else {
+            video.durationFormatted
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .width(120.dp)
-                .aspectRatio(1.6f)
-                .clip(RoundedCornerShape(8.dp))
+                .width(72.dp)
+                .height(52.dp)
+                .clip(RoundedCornerShape(6.dp))
                 .background(FalconSurface)
         ) {
             VideoThumbnailImage(
@@ -1126,24 +1141,9 @@ fun RealVideoListCard(
                 contentDescription = video.title,
                 modifier = Modifier.fillMaxSize()
             )
-
-            Box(
-                modifier = Modifier
-                    .padding(4.dp)
-                    .align(Alignment.BottomEnd)
-                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(3.dp))
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
-            ) {
-                Text(
-                    text = video.durationFormatted,
-                    color = Color.White,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Column(
             modifier = Modifier.weight(1f)
@@ -1153,23 +1153,15 @@ fun RealVideoListCard(
                 color = FalconTextPrimary,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
-                text = video.durationFormatted,
+                text = subtitle,
                 color = FalconTextSecondary,
-                fontSize = 12.sp
-            )
-        }
-
-        IconButton(onClick = { onToggleFavorite() }) {
-            Icon(
-                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = "Favorite",
-                tint = if (isFavorite) FalconRed else FalconTextSecondary,
-                modifier = Modifier.size(20.dp)
+                fontSize = 13.sp,
+                maxLines = 1
             )
         }
 
@@ -1178,7 +1170,7 @@ fun RealVideoListCard(
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "Options",
-                    tint = FalconTextSecondary
+                    tint = FalconTextPrimary
                 )
             }
             DropdownMenu(
@@ -1479,6 +1471,127 @@ fun RealFolderCard(
             fontSize = 12.sp,
             maxLines = 1
         )
+    }
+}
+
+@Composable
+fun RealFolderListCard(
+    folder: FolderItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(72.dp)
+                .height(52.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(FalconSurface)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF2A2A2A))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        folder.previewVideos.getOrNull(0)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF333333))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        folder.previewVideos.getOrNull(1)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                }
+                Row(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF222222))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        folder.previewVideos.getOrNull(2)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(Color(0xFF1F1F1F))
+                            .border(0.5.dp, FalconBackground)
+                    ) {
+                        folder.previewVideos.getOrNull(3)?.let {
+                            VideoThumbnailImage(videoUri = it.contentUri, contentDescription = null, modifier = Modifier.fillMaxSize())
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = folder.bucketName,
+                color = FalconTextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = "${folder.videoCount} video${if (folder.videoCount != 1) "s" else ""}",
+                color = FalconTextSecondary,
+                fontSize = 13.sp,
+                maxLines = 1
+            )
+        }
+
+        Box {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Folder Menu",
+                    tint = FalconTextPrimary
+                )
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                modifier = Modifier.background(FalconSurface)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Open Folder", color = FalconTextPrimary) },
+                    onClick = {
+                        showMenu = false
+                        onClick()
+                    }
+                )
+            }
+        }
     }
 }
 
