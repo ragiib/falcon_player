@@ -24,6 +24,45 @@ data class FolderItem(
     val previewVideos: List<VideoItem>
 )
 
+data class AudioItem(
+    val id: Long,
+    val contentUri: Uri,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val genre: String? = null,
+    val durationMs: Long,
+    val albumId: Long = 0L,
+    val trackNumber: Int = 0,
+    val sizeBytes: Long = 0L,
+    val dateAddedSec: Long = 0L,
+    val albumArtUri: Uri? = null,
+    val durationFormatted: String = formatDuration(durationMs)
+)
+
+data class ArtistItem(
+    val name: String,
+    val albumCount: Int,
+    val trackCount: Int,
+    val tracks: List<AudioItem>,
+    val coverUri: Uri? = null
+)
+
+data class AlbumItem(
+    val id: Long,
+    val title: String,
+    val artist: String,
+    val trackCount: Int,
+    val tracks: List<AudioItem>,
+    val albumArtUri: Uri? = null
+)
+
+data class GenreItem(
+    val name: String,
+    val trackCount: Int,
+    val tracks: List<AudioItem>
+)
+
 fun formatDuration(durationMs: Long): String {
     if (durationMs <= 0) return "0:00"
     val totalSeconds = durationMs / 1000

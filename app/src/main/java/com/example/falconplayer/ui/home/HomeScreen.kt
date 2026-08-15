@@ -102,6 +102,8 @@ import com.example.falconplayer.theme.FalconSurfaceVariant
 import com.example.falconplayer.theme.FalconTextPrimary
 import com.example.falconplayer.theme.FalconTextSecondary
 import com.example.falconplayer.ui.components.VideoThumbnailImage
+import com.example.falconplayer.ui.audio.AudioScreen
+import com.example.falconplayer.ui.audio.AudioViewModel
 import com.example.falconplayer.ui.playlist.PlaylistViewModel
 import com.example.falconplayer.ui.playlist.components.AddToPlaylistDialog
 import com.example.falconplayer.ui.playlist.components.CreatePlaylistDialog
@@ -119,10 +121,12 @@ fun HomeScreen(
     onOpenPlaylist: (playlistId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
-    playlistViewModel: PlaylistViewModel = hiltViewModel()
+    playlistViewModel: PlaylistViewModel = hiltViewModel(),
+    audioViewModel: AudioViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val audioUiState by audioViewModel.uiState.collectAsStateWithLifecycle()
     val playlists by playlistViewModel.playlists.collectAsStateWithLifecycle()
 
     val showCreateDialog by playlistViewModel.showCreateDialog.collectAsStateWithLifecycle()
@@ -568,6 +572,34 @@ fun HomeScreen(
                 .padding(innerPadding)
         ) {
             when {
+                selectedNavIndex == 1 -> {
+                    AudioScreen(
+                        uiState = audioUiState,
+                        onTabSelected = audioViewModel::selectTab,
+                        onSearchToggle = audioViewModel::toggleSearch,
+                        onSearchQueryChange = audioViewModel::onSearchQueryChange,
+                        onPlayTrack = { track -> onPlayMedia(track.contentUri, track.title) },
+                        onPlayTracks = { tracks -> tracks.firstOrNull()?.let { onPlayMedia(it.contentUri, it.title) } },
+                        onAddToPlaylist = { audioItem ->
+                            playlistViewModel.openAddToPlaylistDialog(
+                                listOf(
+                                    VideoItem(
+                                        id = audioItem.id,
+                                        contentUri = audioItem.contentUri,
+                                        title = audioItem.title,
+                                        durationMs = audioItem.durationMs,
+                                        width = 0,
+                                        height = 0,
+                                        sizeBytes = audioItem.sizeBytes,
+                                        bucketId = "audio",
+                                        bucketName = "Audio"
+                                    )
+                                )
+                            )
+                        }
+                    )
+                }
+
                 // State 1: Permission Not Granted
                 !uiState.hasPermission -> {
                     Column(
