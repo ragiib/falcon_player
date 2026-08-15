@@ -3,8 +3,12 @@ package com.example.falconplayer.ui.home
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.falconplayer.data.DisplaySettingsData
+import com.example.falconplayer.data.DisplaySettingsRepository
+import com.example.falconplayer.data.FavoritesRepository
 import com.example.falconplayer.data.FolderItem
 import com.example.falconplayer.data.HistoryRepository
+import com.example.falconplayer.data.SortType
 import com.example.falconplayer.data.VideoItem
 import com.example.falconplayer.data.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,28 +29,56 @@ data class HomeUiState(
     val isSearching: Boolean = false,
     val searchQuery: String = "",
     val isHistoryActive: Boolean = false,
-    val historyVideos: List<VideoItem> = emptyList()
+    val historyVideos: List<VideoItem> = emptyList(),
+    val isListView: Boolean = false,
+    val showOnlyFavorites: Boolean = false,
+    val incognitoMode: Boolean = false,
+    val groupOption: String = "Group by name",
+    val playbackAction: String = "Play",
+    val sortType: SortType = SortType.NAME_ASC,
+    val favoriteUris: List<String> = emptyList(),
+    val showDisplaySettingsScreen: Boolean = false
 ) {
     val filteredVideos: List<VideoItem>
-        get() = when {
-            isSearching -> {
-                if (searchQuery.isBlank()) {
-                    videos
-                } else {
-                    videos.filter { it.title.contains(searchQuery, ignoreCase = true) }
+        get() {
+            val baseList = when {
+                isSearching -> {
+                    if (searchQuery.isBlank()) {
+                        videos
+                    } else {
+                        videos.filter { it.title.contains(searchQuery, ignoreCase = true) }
+                    }
                 }
+                selectedFolderBucketId != null -> {
+                    videos.filter { it.bucketId == selectedFolderBucketId }
+                }
+                else -> videos
             }
-            selectedFolderBucketId != null -> {
-                videos.filter { it.bucketId == selectedFolderBucketId }
+
+            val favFiltered = if (showOnlyFavorites) {
+                baseList.filter { it.contentUri.toString() in favoriteUris }
+            } else {
+                baseList
             }
-            else -> videos
+
+            return when (sortType) {
+                SortType.NAME_ASC -> favFiltered.sortedBy { it.title.lowercase() }
+                SortType.NAME_DESC -> favFiltered.sortedByDescending { it.title.lowercase() }
+                SortType.LENGTH_ASC -> favFiltered.sortedBy { it.durationMs }
+                SortType.LENGTH_DESC -> favFiltered.sortedByDescending { it.durationMs }
+                SortType.ADDED_ASC, SortType.INSERTION_ASC -> favFiltered.sortedBy { it.id }
+                SortType.ADDED_DESC -> favFiltered.sortedByDescending { it.id }
+                SortType.TRACKS_DESC, SortType.TRACKS_ASC -> favFiltered
+            }
         }
 }
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val videoRepository: VideoRepository,
-    private val historyRepository: HistoryRepository
+    private val historyRepository: HistoryRepository,
+    private val displaySettingsRepository: DisplaySettingsRepository,
+    private val favoritesRepository: FavoritesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -54,12 +86,39 @@ class HomeViewModel @Inject constructor(
 
     init {
         observeHistory()
+        observeDisplaySettings()
+        observeFavorites()
     }
 
     private fun observeHistory() {
         viewModelScope.launch {
             historyRepository.historyUris.collect { uris ->
                 updateHistoryVideos(uris, _uiState.value.videos)
+            }
+        }
+    }
+
+    private fun observeDisplaySettings() {
+        viewModelScope.launch {
+            displaySettingsRepository.settings.collect { settings ->
+                _uiState.update {
+                    it.copy(
+                        isListView = settings.isListView,
+                        showOnlyFavorites = settings.showOnlyFavorites,
+                        incognitoMode = settings.incognitoMode,
+                        groupOption = settings.groupOption,
+                        playbackAction = settings.playbackAction,
+                        sortType = settings.sortType
+                    )
+                }
+            }
+        }
+    }
+
+    private fun observeFavorites() {
+        viewModelScope.launch {
+            favoritesRepository.favoriteUris.collect { favs ->
+                _uiState.update { it.copy(favoriteUris = favs) }
             }
         }
     }
@@ -139,6 +198,7 @@ class HomeViewModel @Inject constructor(
             it.copy(
                 isSearching = true,
                 isHistoryActive = false,
+                showDisplaySettingsScreen = false,
                 searchQuery = ""
             )
         }
@@ -158,6 +218,7 @@ class HomeViewModel @Inject constructor(
             it.copy(
                 isHistoryActive = true,
                 isSearching = false,
+                showDisplaySettingsScreen = false,
                 searchQuery = ""
             )
         }
@@ -166,6 +227,76 @@ class HomeViewModel @Inject constructor(
     fun closeHistory() {
         _uiState.update {
             it.copy(isHistoryActive = false)
+        }
+    }
+
+    fun openDisplaySettings() {
+        _uiState.update {
+            it.copy(
+                showDisplaySettingsScreen = true,
+                isSearching = false,
+                isHistoryActive = false
+            )
+        }
+    }
+
+    fun closeDisplaySettings() {
+        _uiState.update {
+            it.copy(showDisplaySettingsScreen = false)
+        }
+    }
+
+    fun toggleIncognitoMode() {
+        viewModelScope.launch {
+            displaySettingsRepository.updateSettings {
+                it.copy(incognitoMode = !it.incognitoMode)
+            }
+        }
+    }
+
+    fun toggleListView() {
+        viewModelScope.launch {
+            displaySettingsRepository.updateSettings {
+                it.copy(isListView = !it.isListView)
+            }
+        }
+    }
+
+    fun toggleShowOnlyFavorites() {
+        viewModelScope.launch {
+            displaySettingsRepository.updateSettings {
+                it.copy(showOnlyFavorites = !it.showOnlyFavorites)
+            }
+        }
+    }
+
+    fun setGroupOption(option: String) {
+        viewModelScope.launch {
+            displaySettingsRepository.updateSettings {
+                it.copy(groupOption = option)
+            }
+        }
+    }
+
+    fun setPlaybackAction(action: String) {
+        viewModelScope.launch {
+            displaySettingsRepository.updateSettings {
+                it.copy(playbackAction = action)
+            }
+        }
+    }
+
+    fun setSortType(sortType: SortType) {
+        viewModelScope.launch {
+            displaySettingsRepository.updateSettings {
+                it.copy(sortType = sortType)
+            }
+        }
+    }
+
+    fun toggleFavorite(uriStr: String) {
+        viewModelScope.launch {
+            favoritesRepository.toggleFavorite(uriStr)
         }
     }
 

@@ -18,13 +18,12 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private const val TAG = "HistoryRepository"
-private const val FILE_NAME = "falcon_history.json"
+private const val TAG = "FavoritesRepository"
+private const val FILE_NAME = "falcon_favorites.json"
 
 @Singleton
-class HistoryRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val displaySettingsRepository: DisplaySettingsRepository
+class FavoritesRepository @Inject constructor(
+    @ApplicationContext private val context: Context
 ) {
 
     private val json = Json {
@@ -38,14 +37,14 @@ class HistoryRepository @Inject constructor(
 
     private val mutex = Mutex()
 
-    private val _historyUris = MutableStateFlow<List<String>>(emptyList())
-    val historyUris: StateFlow<List<String>> = _historyUris.asStateFlow()
+    private val _favoriteUris = MutableStateFlow<List<String>>(emptyList())
+    val favoriteUris: StateFlow<List<String>> = _favoriteUris.asStateFlow()
 
     init {
-        loadHistory()
+        loadFavorites()
     }
 
-    private fun loadHistory() {
+    private fun loadFavorites() {
         CoroutineScope(Dispatchers.IO).launch {
             mutex.withLock {
                 try {
@@ -53,46 +52,45 @@ class HistoryRepository @Inject constructor(
                         val content = file.readText()
                         if (content.isNotBlank()) {
                             val list = json.decodeFromString<List<String>>(content)
-                            _historyUris.value = list
-                            Log.d(TAG, "Loaded ${list.size} history items from storage")
+                            _favoriteUris.value = list
+                            Log.d(TAG, "Loaded ${list.size} favorite items from storage")
                             return@withLock
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error loading history file", e)
+                    Log.e(TAG, "Error loading favorites file", e)
                 }
-                _historyUris.value = emptyList()
+                _favoriteUris.value = emptyList()
             }
         }
     }
 
-    private suspend fun saveHistoryToFile(list: List<String>) = withContext(Dispatchers.IO) {
+    private suspend fun saveFavoritesToFile(list: List<String>) = withContext(Dispatchers.IO) {
         mutex.withLock {
             try {
                 val content = json.encodeToString(list)
                 file.writeText(content)
-                _historyUris.value = list
-                Log.d(TAG, "Saved ${list.size} history items to storage")
+                _favoriteUris.value = list
+                Log.d(TAG, "Saved ${list.size} favorites to storage")
             } catch (e: Exception) {
-                Log.e(TAG, "Error saving history file", e)
+                Log.e(TAG, "Error saving favorites file", e)
             }
         }
     }
 
-    suspend fun recordVideoPlayed(uriStr: String) {
+    suspend fun toggleFavorite(uriStr: String) {
         if (uriStr.isBlank()) return
-        if (displaySettingsRepository.settings.value.incognitoMode) {
-            Log.d(TAG, "Incognito mode active: skipping history recording for $uriStr")
-            return
+        val currentList = _favoriteUris.value
+        val updated = if (uriStr in currentList) {
+            currentList - uriStr
+        } else {
+            currentList + uriStr
         }
-        val currentList = _historyUris.value.filterNot { it == uriStr }
-        val updated = listOf(uriStr) + currentList
-        _historyUris.value = updated
-        saveHistoryToFile(updated)
+        _favoriteUris.value = updated
+        saveFavoritesToFile(updated)
     }
 
-    suspend fun clearHistory() {
-        _historyUris.value = emptyList()
-        saveHistoryToFile(emptyList())
+    fun isFavorite(uriStr: String): Boolean {
+        return uriStr in _favoriteUris.value
     }
 }

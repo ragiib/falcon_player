@@ -50,6 +50,10 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -151,8 +155,12 @@ fun HomeScreen(
 
     val focusRequester = remember { FocusRequester() }
 
-    BackHandler(enabled = uiState.isSearching || uiState.isHistoryActive) {
-        if (uiState.isSearching) {
+    var showOptionsDropdown by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = uiState.showDisplaySettingsScreen || uiState.isSearching || uiState.isHistoryActive) {
+        if (uiState.showDisplaySettingsScreen) {
+            viewModel.closeDisplaySettings()
+        } else if (uiState.isSearching) {
             viewModel.closeSearch()
         } else if (uiState.isHistoryActive) {
             viewModel.closeHistory()
@@ -174,7 +182,22 @@ fun HomeScreen(
         }
     }
 
-    Scaffold(
+    if (uiState.showDisplaySettingsScreen) {
+        DisplaySettingsScreen(
+            isListView = uiState.isListView,
+            showOnlyFavorites = uiState.showOnlyFavorites,
+            groupOption = uiState.groupOption,
+            playbackAction = uiState.playbackAction,
+            sortType = uiState.sortType,
+            onBackClick = { viewModel.closeDisplaySettings() },
+            onToggleListView = { viewModel.toggleListView() },
+            onToggleShowOnlyFavorites = { viewModel.toggleShowOnlyFavorites() },
+            onSelectGroupOption = { viewModel.setGroupOption(it) },
+            onSelectPlaybackAction = { viewModel.setPlaybackAction(it) },
+            onSelectSortType = { viewModel.setSortType(it) }
+        )
+    } else {
+        Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = FalconBackground,
         topBar = {
@@ -299,12 +322,57 @@ fun HomeScreen(
                                     tint = FalconTextPrimary
                                 )
                             }
-                            IconButton(onClick = { videoPickerLauncher.launch(arrayOf("video/*")) }) {
-                                Icon(
-                                    imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "Options",
-                                    tint = FalconTextPrimary
-                                )
+                            Box {
+                                IconButton(onClick = { showOptionsDropdown = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "Options",
+                                        tint = FalconTextPrimary
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showOptionsDropdown,
+                                    onDismissRequest = { showOptionsDropdown = false },
+                                    modifier = Modifier.background(FalconSurface)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Display settings", color = FalconTextPrimary) },
+                                        onClick = {
+                                            showOptionsDropdown = false
+                                            viewModel.openDisplaySettings()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("Incognito mode", color = FalconTextPrimary)
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Checkbox(
+                                                    checked = uiState.incognitoMode,
+                                                    onCheckedChange = null,
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = FalconRed,
+                                                        uncheckedColor = FalconTextSecondary
+                                                    )
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.toggleIncognitoMode()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Refresh", color = FalconTextPrimary) },
+                                        onClick = {
+                                            showOptionsDropdown = false
+                                            viewModel.loadMedia()
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -791,7 +859,7 @@ fun HomeScreen(
                     }
 
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                        columns = GridCells.Fixed(if (uiState.isListView) 1 else 2),
                         contentPadding = PaddingValues(
                             start = 12.dp,
                             end = 12.dp,
@@ -810,11 +878,24 @@ fun HomeScreen(
                         }) { item ->
                             when (item) {
                                 is GridCardItem.Video -> {
-                                    RealVideoCard(
-                                        video = item.item,
-                                        onClick = { onPlayMedia(item.item.contentUri, item.item.title) },
-                                        onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(item.item)) }
-                                    )
+                                    val isFav = item.item.contentUri.toString() in uiState.favoriteUris
+                                    if (uiState.isListView) {
+                                        RealVideoListCard(
+                                            video = item.item,
+                                            isFavorite = isFav,
+                                            onClick = { onPlayMedia(item.item.contentUri, item.item.title) },
+                                            onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(item.item)) },
+                                            onToggleFavorite = { viewModel.toggleFavorite(item.item.contentUri.toString()) }
+                                        )
+                                    } else {
+                                        RealVideoCard(
+                                            video = item.item,
+                                            isFavorite = isFav,
+                                            onClick = { onPlayMedia(item.item.contentUri, item.item.title) },
+                                            onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(item.item)) },
+                                            onToggleFavorite = { viewModel.toggleFavorite(item.item.contentUri.toString()) }
+                                        )
+                                    }
                                 }
 
                                 is GridCardItem.Folder -> {
@@ -871,6 +952,7 @@ fun HomeScreen(
             }
         )
     }
+    }
 }
 
 @Composable
@@ -878,6 +960,8 @@ fun RealVideoCard(
     video: VideoItem,
     onClick: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -957,6 +1041,22 @@ fun RealVideoCard(
                             onAddToPlaylist()
                         }
                     )
+                    onToggleFavorite?.let { toggleFav ->
+                        DropdownMenuItem(
+                            text = { Text(if (isFavorite) "Remove Favorite" else "Add to Favorites", color = FalconTextPrimary) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = FalconRed
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                toggleFav()
+                            }
+                        )
+                    }
                 }
             }
 
@@ -993,6 +1093,129 @@ fun RealVideoCard(
             fontSize = 12.sp,
             maxLines = 1
         )
+    }
+}
+
+@Composable
+fun RealVideoListCard(
+    video: VideoItem,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(120.dp)
+                .aspectRatio(1.6f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(FalconSurface)
+        ) {
+            VideoThumbnailImage(
+                videoUri = video.contentUri,
+                contentDescription = video.title,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .align(Alignment.BottomEnd)
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(3.dp))
+                    .padding(horizontal = 4.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    text = video.durationFormatted,
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = video.title,
+                color = FalconTextPrimary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = video.durationFormatted,
+                color = FalconTextSecondary,
+                fontSize = 12.sp
+            )
+        }
+
+        IconButton(onClick = { onToggleFavorite() }) {
+            Icon(
+                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = "Favorite",
+                tint = if (isFavorite) FalconRed else FalconTextSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Box {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = FalconTextSecondary
+                )
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                modifier = Modifier.background(FalconSurface)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Add to Playlist", color = FalconTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                            contentDescription = null,
+                            tint = FalconRed
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        onAddToPlaylist()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(if (isFavorite) "Remove Favorite" else "Add to Favorites", color = FalconTextPrimary) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = FalconRed
+                        )
+                    },
+                    onClick = {
+                        showMenu = false
+                        onToggleFavorite()
+                    }
+                )
+            }
+        }
     }
 }
 
