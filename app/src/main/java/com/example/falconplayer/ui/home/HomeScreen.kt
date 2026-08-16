@@ -104,6 +104,7 @@ import com.example.falconplayer.theme.FalconTextSecondary
 import com.example.falconplayer.ui.components.VideoThumbnailImage
 import com.example.falconplayer.ui.audio.AudioScreen
 import com.example.falconplayer.ui.audio.AudioViewModel
+import com.example.falconplayer.ui.browse.BrowseScreen
 import com.example.falconplayer.ui.playlist.PlaylistViewModel
 import com.example.falconplayer.ui.playlist.components.AddToPlaylistDialog
 import com.example.falconplayer.ui.playlist.components.CreatePlaylistDialog
@@ -597,6 +598,29 @@ fun HomeScreen(
                                         sizeBytes = audioItem.sizeBytes,
                                         bucketId = "audio",
                                         bucketName = "Audio"
+                                    )
+                                )
+                            )
+                        }
+                    )
+                }
+
+                selectedNavIndex == 2 -> {
+                    BrowseScreen(
+                        onPlayMedia = onPlayMedia,
+                        onAddToPlaylist = { uri, title ->
+                            playlistViewModel.openAddToPlaylistDialog(
+                                listOf(
+                                    VideoItem(
+                                        id = uri.hashCode().toLong(),
+                                        contentUri = uri,
+                                        title = title,
+                                        durationMs = 0L,
+                                        width = 0,
+                                        height = 0,
+                                        sizeBytes = 0L,
+                                        bucketId = "browse",
+                                        bucketName = "Browse"
                                     )
                                 )
                             )
