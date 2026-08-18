@@ -230,6 +230,18 @@ class PlayerViewModel @Inject constructor(
         onUserActivity()
     }
 
+    fun stopPlayback() {
+        saveCurrentPosition()
+        if (player.isPlaying) {
+            player.pause()
+        }
+        player.stop()
+        player.clearMediaItems()
+        stopProgressTicker()
+        cancelHideControlsTimer()
+        _uiState.update { it.copy(playbackState = PlaybackState.Idle) }
+    }
+
     // UI Control Logic (Unchanged)
     fun onControlsScreenTap() {
         when (_uiState.value.controlsState) {

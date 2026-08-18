@@ -1,6 +1,7 @@
 package com.example.falconplayer.ui.player
 
 import android.content.pm.ActivityInfo
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -59,6 +60,13 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
+
+    val handleBack = {
+        viewModel.stopPlayback()
+        onBackClick()
+    }
+
+    BackHandler(onBack = handleBack)
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -161,7 +169,7 @@ fun PlayerScreen(
         // Layer 3: Controls Overlay
         PlayerControls(
             uiState = uiState,
-            onBackClick = onBackClick,
+            onBackClick = handleBack,
             onOverflowClick = { videoPickerLauncher.launch(arrayOf("video/*")) }, // Reusing overflow as open file
             onPlayPauseClick = viewModel::onPlayPauseClick,
             onPreviousClick = viewModel::onPreviousClick,
