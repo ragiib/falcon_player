@@ -79,7 +79,8 @@ class PlayerViewModel @Inject constructor(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                _uiState.update { it.copy(playbackState = PlaybackState.Error(error.message ?: "Unknown error")) }
+                val errorMsg = error.message.takeIf { !it.isNullOrBlank() } ?: "Playback failed. The video format may be unsupported or unreadable."
+                _uiState.update { it.copy(playbackState = PlaybackState.Error(errorMsg)) }
             }
         })
     }
@@ -87,7 +88,8 @@ class PlayerViewModel @Inject constructor(
     private fun updatePlaybackState() {
         val playerError = player.playerError
         if (playerError != null) {
-            _uiState.update { it.copy(playbackState = PlaybackState.Error(playerError.message ?: "Unknown error")) }
+            val errorMsg = playerError.message.takeIf { !it.isNullOrBlank() } ?: "Playback failed. The video format may be unsupported or unreadable."
+            _uiState.update { it.copy(playbackState = PlaybackState.Error(errorMsg)) }
             return
         }
         val newState = when (player.playbackState) {
@@ -142,6 +144,8 @@ class PlayerViewModel @Inject constructor(
                 currentQueueIndex = startIndex.coerceIn(0, orderedVideos.size - 1)
                 val targetVideo = orderedVideos[currentQueueIndex]
                 loadVideo(targetVideo.contentUri, targetVideo.title)
+            } else {
+                _uiState.update { it.copy(playbackState = PlaybackState.Error("No playable videos found in playlist")) }
             }
         }
     }
