@@ -162,13 +162,15 @@ fun HomeScreen(
 
     var showOptionsDropdown by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = uiState.showDisplaySettingsScreen || uiState.isSearching || uiState.isHistoryActive) {
+    BackHandler(enabled = uiState.showDisplaySettingsScreen || uiState.isSearching || uiState.isHistoryActive || selectedNavIndex == 4) {
         if (uiState.showDisplaySettingsScreen) {
             viewModel.closeDisplaySettings()
         } else if (uiState.isSearching) {
             viewModel.closeSearch()
         } else if (uiState.isHistoryActive) {
             viewModel.closeHistory()
+        } else if (selectedNavIndex == 4) {
+            selectedNavIndex = 0
         }
     }
 
@@ -577,6 +579,18 @@ fun HomeScreen(
                 .padding(innerPadding)
         ) {
             when {
+                selectedNavIndex == 4 -> {
+                    MoreScreen(
+                        historyVideos = uiState.historyVideos,
+                        incognitoMode = uiState.incognitoMode,
+                        onOpenDisplaySettings = { viewModel.openDisplaySettings() },
+                        onToggleIncognitoMode = { viewModel.toggleIncognitoMode() },
+                        onRefresh = { viewModel.loadMedia() },
+                        onOpenHistory = { viewModel.openHistory() },
+                        onPlayMedia = onPlayMedia
+                    )
+                }
+
                 selectedNavIndex == 1 -> {
                     AudioScreen(
                         uiState = audioUiState,
