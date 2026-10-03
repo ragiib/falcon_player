@@ -1,12 +1,21 @@
 package com.example.falconplayer.ui.player.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.PictureInPictureAlt
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -18,23 +27,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.falconplayer.ui.player.PlaybackState
+import com.example.falconplayer.theme.FalconRed
 
 @Composable
 fun PlayerTopBar(
     title: String,
-    playbackState: PlaybackState,
+    hasSubtitlesOn: Boolean,
     onBackClick: () -> Unit,
-    onOpenFileClick: () -> Unit,
+    onAudioClick: () -> Unit,
+    onSubtitlesClick: () -> Unit,
+    onAspectRatioClick: () -> Unit,
+    onPipClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Back Button & Clean Title (No redundant status indicator pill)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
@@ -46,29 +59,68 @@ fun PlayerTopBar(
                     tint = Color.White
                 )
             }
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = title,
                 color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .padding(start = 8.dp, end = 8.dp)
-            )
-            PlaybackStatusIndicator(
-                playbackState = playbackState,
-                modifier = Modifier.padding(end = 8.dp)
+                overflow = TextOverflow.Ellipsis
             )
         }
 
-        IconButton(onClick = onOpenFileClick) {
-            Icon(
-                imageVector = Icons.Filled.FolderOpen,
-                contentDescription = "Open File",
-                tint = Color.White
-            )
+        // Action Icons (Subtitles, Audio, Aspect Ratio, PiP)
+        // Note: Playback Speed is exclusively housed in Bottom Controls to eliminate duplicate speed controls.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            // Subtitles Button
+            Box(contentAlignment = Alignment.TopEnd) {
+                IconButton(onClick = onSubtitlesClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Subtitles,
+                        contentDescription = "Subtitles",
+                        tint = if (hasSubtitlesOn) FalconRed else Color.White
+                    )
+                }
+                if (hasSubtitlesOn) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 8.dp, end = 8.dp)
+                            .size(7.dp)
+                            .background(FalconRed, CircleShape)
+                    )
+                }
+            }
+
+            // Audio Track Selector
+            IconButton(onClick = onAudioClick) {
+                Icon(
+                    imageVector = Icons.Filled.Audiotrack,
+                    contentDescription = "Audio Tracks",
+                    tint = Color.White
+                )
+            }
+
+            // Video Scaling / Aspect Ratio Toggle
+            IconButton(onClick = onAspectRatioClick) {
+                Icon(
+                    imageVector = Icons.Filled.AspectRatio,
+                    contentDescription = "Aspect Ratio",
+                    tint = Color.White
+                )
+            }
+
+            // Picture-in-Picture (PiP)
+            IconButton(onClick = onPipClick) {
+                Icon(
+                    imageVector = Icons.Filled.PictureInPictureAlt,
+                    contentDescription = "Picture-in-Picture",
+                    tint = Color.White
+                )
+            }
         }
     }
 }

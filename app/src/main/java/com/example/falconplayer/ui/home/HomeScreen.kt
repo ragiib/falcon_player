@@ -92,6 +92,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.falconplayer.data.FolderItem
 import com.example.falconplayer.data.Playlist
 import com.example.falconplayer.data.VideoItem
@@ -102,8 +104,11 @@ import com.example.falconplayer.theme.FalconSurfaceVariant
 import com.example.falconplayer.theme.FalconTextPrimary
 import com.example.falconplayer.theme.FalconTextSecondary
 import com.example.falconplayer.ui.components.VideoThumbnailImage
+import com.example.falconplayer.ui.components.FalconLogo
 import com.example.falconplayer.ui.audio.AudioScreen
 import com.example.falconplayer.ui.audio.AudioViewModel
+import com.example.falconplayer.ui.audio.components.AudioMiniPlayer
+import com.example.falconplayer.ui.audio.components.AudioPlayerSheet
 import com.example.falconplayer.ui.browse.BrowseScreen
 import com.example.falconplayer.ui.playlist.PlaylistViewModel
 import com.example.falconplayer.ui.playlist.components.AddToPlaylistDialog
@@ -116,6 +121,7 @@ sealed interface GridCardItem {
     data class Folder(val item: FolderItem) : GridCardItem
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onPlayMedia: (uri: Uri?, title: String?) -> Unit,
@@ -128,6 +134,8 @@ fun HomeScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val audioUiState by audioViewModel.uiState.collectAsStateWithLifecycle()
+    val audioPlaybackState by audioViewModel.playbackState.collectAsStateWithLifecycle()
+    val audioSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val playlists by playlistViewModel.playlists.collectAsStateWithLifecycle()
 
     val showCreateDialog by playlistViewModel.showCreateDialog.collectAsStateWithLifecycle()
@@ -138,16 +146,31 @@ fun HomeScreen(
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = VIDEOS, 1 = PLAYLISTS
     var selectedNavIndex by remember { mutableIntStateOf(0) }
 
-    val requiredPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_VIDEO
+    val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        arrayOf(
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.READ_MEDIA_AUDIO
+        )
     } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
+        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        viewModel.onPermissionResult(isGranted)
+    val permissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val videoGranted = results[Manifest.permission.READ_MEDIA_VIDEO] == true ||
+                results[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+        val audioGranted = results[Manifest.permission.READ_MEDIA_AUDIO] == true ||
+                results[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+
+        viewModel.onPermissionResult(videoGranted || audioGranted)
+        audioViewModel.onPermissionResult(audioGranted)
+        if (videoGranted) {
+            viewModel.loadMedia()
+        }
+        if (audioGranted) {
+            audioViewModel.loadAudio()
+        }
     }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
@@ -181,11 +204,21 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        val permissionCheck = ContextCompat.checkSelfPermission(context, requiredPermission)
-        if (permissionCheck == PackageManager.PERMISSION_GRANTED) {
-            viewModel.onPermissionResult(true)
+        val hasVideo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
         } else {
-            permissionLauncher.launch(requiredPermission)
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        val hasAudio = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+
+        viewModel.onPermissionResult(hasVideo)
+        audioViewModel.onPermissionResult(hasAudio)
+        if (!hasVideo || !hasAudio) {
+            permissionsLauncher.launch(permissionsToRequest)
         }
     }
 
@@ -523,52 +556,62 @@ fun HomeScreen(
             }
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = FalconSurface,
-                tonalElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val navItems = listOf(
-                    Triple("Video", Icons.Default.Movie, 0),
-                    Triple("Audio", Icons.Default.Audiotrack, 1),
-                    Triple("Browse", Icons.Default.Folder, 2),
-                    Triple("Playlists", Icons.AutoMirrored.Filled.PlaylistPlay, 3),
-                    Triple("More", Icons.Default.MoreHoriz, 4)
-                )
-
-                navItems.forEach { (label, icon, index) ->
-                    val isSelected = selectedNavIndex == index
-                    NavigationBarItem(
-                        selected = isSelected,
-                        onClick = {
-                            selectedNavIndex = index
-                            if (index == 0) {
-                                selectedTab = 0
-                            } else if (index == 3) {
-                                selectedTab = 1
-                            }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = label
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = label,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = FalconRed,
-                            selectedTextColor = FalconRed,
-                            unselectedIconColor = FalconTextSecondary,
-                            unselectedTextColor = FalconTextSecondary,
-                            indicatorColor = FalconSurfaceVariant
-                        )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (audioPlaybackState.currentTrack != null) {
+                    AudioMiniPlayer(
+                        playbackState = audioPlaybackState,
+                        onExpandClick = { audioViewModel.openPlayerSheet() },
+                        onTogglePlayPause = { audioViewModel.playbackManager.togglePlayPause() },
+                        onNextClick = { audioViewModel.playbackManager.next() }
                     )
+                }
+                NavigationBar(
+                    containerColor = FalconSurface,
+                    tonalElevation = 8.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val navItems = listOf(
+                        Triple("Video", Icons.Default.Movie, 0),
+                        Triple("Audio", Icons.Default.Audiotrack, 1),
+                        Triple("Browse", Icons.Default.Folder, 2),
+                        Triple("Playlists", Icons.AutoMirrored.Filled.PlaylistPlay, 3),
+                        Triple("More", Icons.Default.MoreHoriz, 4)
+                    )
+
+                    navItems.forEach { (label, icon, index) ->
+                        val isSelected = selectedNavIndex == index
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = {
+                                selectedNavIndex = index
+                                if (index == 0) {
+                                    selectedTab = 0
+                                } else if (index == 3) {
+                                    selectedTab = 1
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = FalconRed,
+                                selectedTextColor = FalconRed,
+                                unselectedIconColor = FalconTextSecondary,
+                                unselectedTextColor = FalconTextSecondary,
+                                indicatorColor = FalconSurfaceVariant
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -597,8 +640,8 @@ fun HomeScreen(
                         onTabSelected = audioViewModel::selectTab,
                         onSearchToggle = audioViewModel::toggleSearch,
                         onSearchQueryChange = audioViewModel::onSearchQueryChange,
-                        onPlayTrack = { track -> onPlayMedia(track.contentUri, track.title) },
-                        onPlayTracks = { tracks -> tracks.firstOrNull()?.let { onPlayMedia(it.contentUri, it.title) } },
+                        onPlayTrack = { track -> audioViewModel.playTrack(track) },
+                        onPlayTracks = { tracks -> audioViewModel.playTracks(tracks) },
                         onAddToPlaylist = { audioItem ->
                             playlistViewModel.openAddToPlaylistDialog(
                                 listOf(
@@ -615,7 +658,9 @@ fun HomeScreen(
                                     )
                                 )
                             )
-                        }
+                        },
+                        onRefresh = { audioViewModel.loadAudio() },
+                        onRequestPermission = { permissionsLauncher.launch(permissionsToRequest) }
                     )
                 }
 
@@ -673,7 +718,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Button(
-                            onClick = { permissionLauncher.launch(requiredPermission) },
+                            onClick = { permissionsLauncher.launch(permissionsToRequest) },
                             colors = ButtonDefaults.buttonColors(containerColor = FalconRed)
                         ) {
                             Text(text = "Grant Permission", color = Color.White)
@@ -1031,6 +1076,22 @@ fun HomeScreen(
                 playlistViewModel.closeAddToPlaylistDialog()
                 playlistViewModel.openCreateDialog()
             }
+        )
+    }
+
+    if (audioUiState.showPlayerSheet && audioPlaybackState.currentTrack != null) {
+        AudioPlayerSheet(
+            sheetState = audioSheetState,
+            playbackState = audioPlaybackState,
+            onDismissRequest = { audioViewModel.closePlayerSheet() },
+            onTogglePlayPause = { audioViewModel.playbackManager.togglePlayPause() },
+            onNextClick = { audioViewModel.playbackManager.next() },
+            onPreviousClick = { audioViewModel.playbackManager.previous() },
+            onSeek = { audioViewModel.playbackManager.seekTo(it) },
+            onToggleShuffle = { audioViewModel.playbackManager.toggleShuffle() },
+            onToggleRepeat = { audioViewModel.playbackManager.toggleRepeat() },
+            onSelectQueueIndex = { audioViewModel.playbackManager.playQueueIndex(it) },
+            onSpeedChange = { audioViewModel.playbackManager.setPlaybackSpeed(it) }
         )
     }
     }
@@ -1671,17 +1732,5 @@ fun RealFolderListCard(
 
 @Composable
 fun FalconLogoIcon(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-
-        val path = Path().apply {
-            moveTo(width * 0.15f, height * 0.15f)
-            lineTo(width * 0.85f, height * 0.50f)
-            lineTo(width * 0.15f, height * 0.85f)
-            lineTo(width * 0.35f, height * 0.50f)
-            close()
-        }
-        drawPath(path, color = FalconRed)
-    }
+    com.example.falconplayer.ui.components.FalconLogo(modifier = modifier)
 }

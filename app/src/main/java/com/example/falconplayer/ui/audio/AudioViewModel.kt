@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.falconplayer.data.AlbumItem
 import com.example.falconplayer.data.ArtistItem
 import com.example.falconplayer.data.AudioItem
+import com.example.falconplayer.data.AudioPlaybackManager
+import com.example.falconplayer.data.AudioPlaybackState
 import com.example.falconplayer.data.AudioRepository
 import com.example.falconplayer.data.GenreItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,13 +19,15 @@ import javax.inject.Inject
 
 data class AudioUiState(
     val isLoading: Boolean = false,
+    val hasPermission: Boolean = true,
     val selectedTab: Int = 0, // 0: ARTISTS, 1: ALBUMS, 2: TRACKS, 3: GENRES, 4: PLAYLISTS
     val tracks: List<AudioItem> = emptyList(),
     val artists: List<ArtistItem> = emptyList(),
     val albums: List<AlbumItem> = emptyList(),
     val genres: List<GenreItem> = emptyList(),
     val isSearching: Boolean = false,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val showPlayerSheet: Boolean = false
 ) {
     val filteredArtists: List<ArtistItem>
         get() = if (searchQuery.isBlank()) artists else artists.filter { it.name.contains(searchQuery, ignoreCase = true) }
@@ -46,11 +50,14 @@ data class AudioUiState(
 
 @HiltViewModel
 class AudioViewModel @Inject constructor(
-    private val audioRepository: AudioRepository
+    private val audioRepository: AudioRepository,
+    val playbackManager: AudioPlaybackManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AudioUiState())
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
+
+    val playbackState: StateFlow<AudioPlaybackState> = playbackManager.playbackState
 
     init {
         loadAudio()
@@ -76,6 +83,13 @@ class AudioViewModel @Inject constructor(
         }
     }
 
+    fun onPermissionResult(isGranted: Boolean) {
+        _uiState.update { it.copy(hasPermission = isGranted) }
+        if (isGranted) {
+            loadAudio()
+        }
+    }
+
     fun selectTab(index: Int) {
         _uiState.update { it.copy(selectedTab = index) }
     }
@@ -92,5 +106,24 @@ class AudioViewModel @Inject constructor(
 
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun openPlayerSheet() {
+        _uiState.update { it.copy(showPlayerSheet = true) }
+    }
+
+    fun closePlayerSheet() {
+        _uiState.update { it.copy(showPlayerSheet = false) }
+    }
+
+    fun playTrack(track: AudioItem) {
+        val currentTabTracks = _uiState.value.tracks
+        playbackManager.playTrack(track, currentTabTracks)
+        openPlayerSheet()
+    }
+
+    fun playTracks(tracks: List<AudioItem>) {
+        playbackManager.playQueue(tracks, 0)
+        openPlayerSheet()
     }
 }

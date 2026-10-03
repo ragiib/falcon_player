@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.CircularProgressIndicator
@@ -166,6 +167,8 @@ fun AudioScreen(
     onPlayTrack: (AudioItem) -> Unit,
     onPlayTracks: (List<AudioItem>) -> Unit,
     onAddToPlaylist: (AudioItem) -> Unit,
+    onRefresh: () -> Unit = {},
+    onRequestPermission: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val tabs = listOf("ARTISTS", "ALBUMS", "TRACKS", "GENRES", "PLAYLISTS")
@@ -209,15 +212,23 @@ fun AudioScreen(
                     )
                 }
             } else {
-                AudioLogoIcon(modifier = Modifier.size(24.dp))
+                com.example.falconplayer.ui.components.FalconLogo(modifier = Modifier.size(26.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Falcon",
+                    text = "Falcon Audio",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = FalconTextPrimary
                 )
                 Spacer(modifier = Modifier.weight(1f))
+
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Rescan Media",
+                        tint = FalconTextPrimary
+                    )
+                }
 
                 IconButton(onClick = onSearchToggle) {
                     Icon(
@@ -234,13 +245,6 @@ fun AudioScreen(
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = FalconTextPrimary
-                    )
-                }
-                IconButton(onClick = { }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Menu",
                         tint = FalconTextPrimary
                     )
                 }
@@ -286,7 +290,44 @@ fun AudioScreen(
                 .fillMaxSize()
                 .weight(1f)
         ) {
-            if (uiState.isLoading) {
+            if (!uiState.hasPermission) {
+                // Permission Required State
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LibraryMusic,
+                        contentDescription = null,
+                        tint = FalconRed,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Audio Permission Required",
+                        color = FalconTextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Falcon Player needs permission to access music and audio files stored on your phone.",
+                        color = FalconTextSecondary,
+                        fontSize = 14.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    androidx.compose.material3.Button(
+                        onClick = onRequestPermission,
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = FalconRed)
+                    ) {
+                        Text("Grant Audio Access", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else if (uiState.isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = FalconRed)
                 }
@@ -313,10 +354,17 @@ fun AudioScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Music and audio files on your device will appear here.",
+                        text = "No audio tracks were detected on your device storage.",
                         color = FalconTextSecondary,
                         fontSize = 14.sp
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = onRefresh,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, FalconRed)
+                    ) {
+                        Text("Rescan Device", color = Color.White)
+                    }
                 }
             } else {
                 when (uiState.selectedTab) {
@@ -828,16 +876,5 @@ private fun GenresTabContent(
 
 @Composable
 fun AudioLogoIcon(modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(width * 0.15f, height * 0.15f)
-            lineTo(width * 0.85f, height * 0.50f)
-            lineTo(width * 0.15f, height * 0.85f)
-            lineTo(width * 0.35f, height * 0.50f)
-            close()
-        }
-        drawPath(path, color = FalconRed)
-    }
+    com.example.falconplayer.ui.components.FalconLogo(modifier = modifier)
 }

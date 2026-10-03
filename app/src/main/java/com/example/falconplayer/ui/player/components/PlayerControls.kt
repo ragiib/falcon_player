@@ -22,7 +22,11 @@ import com.example.falconplayer.ui.player.PlayerUiState
 fun PlayerControls(
     uiState: PlayerUiState,
     onBackClick: () -> Unit,
-    onOverflowClick: () -> Unit,
+    onAudioClick: () -> Unit,
+    onSubtitlesClick: () -> Unit,
+    onAspectRatioClick: () -> Unit,
+    onPipClick: () -> Unit,
+    onSpeedClick: () -> Unit,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -30,7 +34,6 @@ fun PlayerControls(
     onForwardClick: () -> Unit,
     onSeek: (Long) -> Unit,
     onLockToggle: () -> Unit,
-    onSpeedClick: () -> Unit,
     onFullscreenToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -47,10 +50,9 @@ fun PlayerControls(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isVisible) Color.Black.copy(alpha = 0.4f) else Color.Transparent)
+                .background(if (isVisible) Color.Black.copy(alpha = 0.35f) else Color.Transparent)
         ) {
-            
-            // Top Bar (Only if fully visible)
+            // Top Bar
             AnimatedVisibility(
                 visible = isVisible,
                 enter = slideInVertically { -it },
@@ -61,21 +63,24 @@ fun PlayerControls(
                     modifier = Modifier
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
+                                colors = listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)
                             )
                         )
                 ) {
                     PlayerTopBar(
                         title = uiState.mediaInfo.title,
-                        playbackState = uiState.playbackState,
+                        hasSubtitlesOn = uiState.selectedSubtitleTrackId != null,
                         onBackClick = onBackClick,
-                        onOpenFileClick = onOverflowClick, // Maps to the open file logic
-                        modifier = Modifier.padding(top = 24.dp) // Account for status bar
+                        onAudioClick = onAudioClick,
+                        onSubtitlesClick = onSubtitlesClick,
+                        onAspectRatioClick = onAspectRatioClick,
+                        onPipClick = onPipClick,
+                        modifier = Modifier.padding(top = 20.dp)
                     )
                 }
             }
 
-            // Center Controls (Only if fully visible)
+            // Center Playback Controls
             AnimatedVisibility(
                 visible = isVisible,
                 enter = fadeIn(),
@@ -92,7 +97,7 @@ fun PlayerControls(
                 )
             }
 
-            // Bottom Controls (Visible or Locked - to show the lock toggle)
+            // Bottom Controls
             AnimatedVisibility(
                 visible = showAnyControls,
                 enter = slideInVertically { it },
@@ -103,7 +108,7 @@ fun PlayerControls(
                     modifier = Modifier
                         .background(
                             if (isVisible) Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
                             ) else Brush.verticalGradient(
                                 colors = listOf(Color.Transparent, Color.Transparent)
                             )
@@ -112,15 +117,15 @@ fun PlayerControls(
                     PlayerBottomControls(
                         mediaInfo = uiState.mediaInfo,
                         controlsState = uiState.controlsState,
+                        playbackSpeed = uiState.playbackSpeed,
                         onSeek = onSeek,
                         onLockToggle = onLockToggle,
                         onSpeedClick = onSpeedClick,
                         onFullscreenToggle = onFullscreenToggle,
-                        modifier = Modifier.padding(bottom = 24.dp) // Account for nav bar
+                        modifier = Modifier.padding(bottom = 20.dp)
                     )
                 }
             }
         }
     }
 }
-
