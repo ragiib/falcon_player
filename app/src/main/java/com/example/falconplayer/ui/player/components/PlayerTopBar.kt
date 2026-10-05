@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.Icon
@@ -34,7 +33,7 @@ fun PlayerTopBar(
     title: String,
     hasSubtitlesOn: Boolean,
     onBackClick: () -> Unit,
-    onAudioClick: () -> Unit,
+    onAudioClick: () -> Unit = {},
     onSubtitlesClick: () -> Unit,
     onAspectRatioClick: () -> Unit,
     onPipClick: () -> Unit,
@@ -47,7 +46,7 @@ fun PlayerTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Back Button & Clean Title (No redundant status indicator pill)
+        // Back Button & Clean Title
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
@@ -70,18 +69,18 @@ fun PlayerTopBar(
             )
         }
 
-        // Action Icons (Subtitles, Audio, Aspect Ratio, PiP)
-        // Note: Playback Speed is exclusively housed in Bottom Controls to eliminate duplicate speed controls.
+        // Action Icons (Tracks/Subtitles, Aspect Ratio, PiP)
+        // Redundant standalone music icon removed; Audio tracks are accessible via Tracks menu & Settings.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Subtitles Button
+            // Subtitles & Audio Track Menu
             Box(contentAlignment = Alignment.TopEnd) {
                 IconButton(onClick = onSubtitlesClick) {
                     Icon(
                         imageVector = Icons.Filled.Subtitles,
-                        contentDescription = "Subtitles",
+                        contentDescription = "Audio and Subtitles",
                         tint = if (hasSubtitlesOn) FalconRed else Color.White
                     )
                 }
@@ -93,15 +92,6 @@ fun PlayerTopBar(
                             .background(FalconRed, CircleShape)
                     )
                 }
-            }
-
-            // Audio Track Selector
-            IconButton(onClick = onAudioClick) {
-                Icon(
-                    imageVector = Icons.Filled.Audiotrack,
-                    contentDescription = "Audio Tracks",
-                    tint = Color.White
-                )
             }
 
             // Video Scaling / Aspect Ratio Toggle
@@ -124,3 +114,4 @@ fun PlayerTopBar(
         }
     }
 }
+

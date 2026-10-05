@@ -512,6 +512,10 @@ fun PlayerScreen(
                 onOpenMediaInfo = {
                     viewModel.toggleSettingsSheet()
                     viewModel.toggleInfoDialog()
+                },
+                onOpenTrackSheet = {
+                    viewModel.toggleSettingsSheet()
+                    viewModel.openTrackSheet(TrackTab.AUDIO)
                 }
             )
         }

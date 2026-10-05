@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.filled.Subtitles
 import com.example.falconplayer.theme.FalconRed
 import com.example.falconplayer.theme.FalconSurface
 
@@ -48,6 +49,7 @@ fun PlayerSettingsSheet(
     currentSpeed: Float,
     onSpeedSelect: (Float) -> Unit,
     onOpenMediaInfo: () -> Unit = {},
+    onOpenTrackSheet: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val speeds = listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
@@ -186,6 +188,37 @@ fun PlayerSettingsSheet(
                         color = Color.White.copy(alpha = 0.12f),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
+                    Surface(
+                        onClick = onOpenTrackSheet,
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.05f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Subtitles,
+                                contentDescription = null,
+                                tint = FalconRed,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = "Audio & Subtitle Tracks",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Surface(
                         onClick = onOpenMediaInfo,
                         shape = RoundedCornerShape(10.dp),

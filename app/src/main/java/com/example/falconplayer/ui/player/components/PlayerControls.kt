@@ -1,8 +1,12 @@
 package com.example.falconplayer.ui.player.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -10,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -41,29 +46,35 @@ fun PlayerControls(
     val isLocked = uiState.controlsState == ControlsState.Locked
     val showAnyControls = isVisible || isLocked
 
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 0.32f else 0.0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "scrimAlpha"
+    )
+
     AnimatedVisibility(
         visible = showAnyControls,
-        enter = fadeIn(),
-        exit = fadeOut(),
+        enter = fadeIn(animationSpec = tween(260)),
+        exit = fadeOut(animationSpec = tween(260)),
         modifier = modifier.fillMaxSize()
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (isVisible) Color.Black.copy(alpha = 0.35f) else Color.Transparent)
+                .background(Color.Black.copy(alpha = scrimAlpha))
         ) {
-            // Top Bar
+            // Top Bar: Smooth slide & fade
             AnimatedVisibility(
                 visible = isVisible,
-                enter = slideInVertically { -it },
-                exit = slideOutVertically { -it },
+                enter = slideInVertically(animationSpec = tween(260)) { -it } + fadeIn(animationSpec = tween(220)),
+                exit = slideOutVertically(animationSpec = tween(260)) { -it } + fadeOut(animationSpec = tween(220)),
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
                 Box(
                     modifier = Modifier
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)
+                                colors = listOf(Color.Black.copy(alpha = 0.70f), Color.Transparent)
                             )
                         )
                 ) {
@@ -80,11 +91,11 @@ fun PlayerControls(
                 }
             }
 
-            // Center Playback Controls
+            // Center Playback Controls: Compact, minimal cinematic cluster with subtle scale
             AnimatedVisibility(
                 visible = isVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = fadeIn(animationSpec = tween(220)) + scaleIn(initialScale = 0.94f, animationSpec = tween(220)),
+                exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.94f, animationSpec = tween(200)),
                 modifier = Modifier.align(Alignment.Center)
             ) {
                 PlayerCenterControls(
@@ -97,18 +108,18 @@ fun PlayerControls(
                 )
             }
 
-            // Bottom Controls
+            // Bottom Controls: Smooth slide & fade
             AnimatedVisibility(
                 visible = showAnyControls,
-                enter = slideInVertically { it },
-                exit = slideOutVertically { it },
+                enter = slideInVertically(animationSpec = tween(260)) { it } + fadeIn(animationSpec = tween(220)),
+                exit = slideOutVertically(animationSpec = tween(260)) { it } + fadeOut(animationSpec = tween(220)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 Box(
                     modifier = Modifier
                         .background(
                             if (isVisible) Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.80f))
                             ) else Brush.verticalGradient(
                                 colors = listOf(Color.Transparent, Color.Transparent)
                             )
@@ -129,3 +140,4 @@ fun PlayerControls(
         }
     }
 }
+
