@@ -6,7 +6,10 @@ import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -57,6 +61,8 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -143,6 +149,36 @@ fun HomeScreen(
     val deleteTarget by playlistViewModel.deleteTarget.collectAsStateWithLifecycle()
     val addToPlaylistVideos by playlistViewModel.addToPlaylistVideos.collectAsStateWithLifecycle()
 
+    // Delete single video state
+    var videoToDelete by remember { mutableStateOf<VideoItem?>(null) }
+    var pendingDeleteUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Launcher for Android Q+ OS-level single delete permission
+    val deleteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            pendingDeleteUri?.let { uri -> viewModel.onVideoDeletedAfterPermission(uri) }
+            pendingDeleteUri = null
+        }
+    }
+
+    // Bulk delete state
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var pendingBulkDeleteUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+    // Launcher for Android 11+ bulk OS-level delete permission
+    val bulkDeleteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.onBulkDeletedAfterPermission(pendingBulkDeleteUris)
+            pendingBulkDeleteUris = emptyList()
+        } else {
+            pendingBulkDeleteUris = emptyList()
+        }
+    }
+
     var selectedTab by remember { mutableIntStateOf(0) } // 0 = VIDEOS, 1 = PLAYLISTS
     var selectedNavIndex by remember { mutableIntStateOf(0) }
 
@@ -184,16 +220,16 @@ fun HomeScreen(
     val focusRequester = remember { FocusRequester() }
 
     var showOptionsDropdown by remember { mutableStateOf(false) }
+    var showSelectionDropdown by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = uiState.showDisplaySettingsScreen || uiState.isSearching || uiState.isHistoryActive || selectedNavIndex == 4) {
-        if (uiState.showDisplaySettingsScreen) {
-            viewModel.closeDisplaySettings()
-        } else if (uiState.isSearching) {
-            viewModel.closeSearch()
-        } else if (uiState.isHistoryActive) {
-            viewModel.closeHistory()
-        } else if (selectedNavIndex == 4) {
-            selectedNavIndex = 0
+    // BackHandler: selection mode exits first, then other states
+    BackHandler(enabled = uiState.isSelectionMode || uiState.showDisplaySettingsScreen || uiState.isSearching || uiState.isHistoryActive || selectedNavIndex == 4) {
+        when {
+            uiState.isSelectionMode -> viewModel.clearSelection()
+            uiState.showDisplaySettingsScreen -> viewModel.closeDisplaySettings()
+            uiState.isSearching -> viewModel.closeSearch()
+            uiState.isHistoryActive -> viewModel.closeHistory()
+            selectedNavIndex == 4 -> selectedNavIndex = 0
         }
     }
 
@@ -222,6 +258,31 @@ fun HomeScreen(
         }
     }
 
+    // Collect single delete events from ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.deleteIntentSender.collect { (intentSender, uri) ->
+            pendingDeleteUri = uri
+            deleteLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.deleteErrorMessage.collect { message ->
+            Toast.makeText(context, "Delete failed: $message", Toast.LENGTH_SHORT).show()
+        }
+    }
+    // Collect bulk delete events from ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.bulkDeleteIntentSender.collect { (intentSender, uris) ->
+            pendingBulkDeleteUris = uris
+            bulkDeleteLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.bulkDeleteErrorMessage.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     if (uiState.showDisplaySettingsScreen) {
         DisplaySettingsScreen(
             isListView = uiState.isListView,
@@ -247,7 +308,71 @@ fun HomeScreen(
                         .background(FalconBackground)
                         .statusBarsPadding()
                 ) {
-                if (uiState.isSearching) {
+                // Selection Mode Toolbar
+                if (uiState.isSelectionMode) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(FalconSurface)
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { viewModel.clearSelection() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Exit selection",
+                                    tint = FalconTextPrimary
+                                )
+                            }
+                            Text(
+                                text = "${uiState.selectedVideoIds.size} selected",
+                                color = FalconTextPrimary,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Direct delete icon button
+                            if (uiState.selectedVideoIds.isNotEmpty()) {
+                                IconButton(onClick = { showBulkDeleteDialog = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete selected",
+                                        tint = FalconRed
+                                    )
+                                }
+                            }
+                            // Overflow menu for selection
+                            Box {
+                                IconButton(onClick = { showSelectionDropdown = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "More options",
+                                        tint = FalconTextPrimary
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showSelectionDropdown,
+                                    onDismissRequest = { showSelectionDropdown = false },
+                                    modifier = Modifier.background(FalconSurface)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Delete selected", color = FalconRed) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Delete, contentDescription = null, tint = FalconRed)
+                                        },
+                                        onClick = {
+                                            showSelectionDropdown = false
+                                            showBulkDeleteDialog = true
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (uiState.isSearching) {
                     // Search Bar
                     Row(
                         modifier = Modifier
@@ -787,10 +912,17 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(uiState.filteredVideos, key = { "search_video_${it.id}" }) { video ->
+                            val isSelected = video.id in uiState.selectedVideoIds
                             RealVideoCard(
                                 video = video,
-                                onClick = { onPlayMedia(video.contentUri, video.title) },
-                                onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) }
+                                onClick = {
+                                    if (uiState.isSelectionMode) viewModel.toggleVideoSelection(video.id)
+                                    else onPlayMedia(video.contentUri, video.title)
+                                },
+                                onLongClick = { viewModel.enterSelectionModeWithVideo(video.id) },
+                                isSelected = isSelected,
+                                onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) },
+                                onDelete = { videoToDelete = video }
                             )
                         }
                     }
@@ -843,13 +975,20 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(uiState.historyVideos, key = { "history_video_${it.id}" }) { video ->
+                            val isSelected = video.id in uiState.selectedVideoIds
                             RealVideoCard(
                                 video = video,
                                 onClick = {
-                                    viewModel.recordVideoPlayed(video.contentUri.toString())
-                                    onPlayMedia(video.contentUri, video.title)
+                                    if (uiState.isSelectionMode) viewModel.toggleVideoSelection(video.id)
+                                    else {
+                                        viewModel.recordVideoPlayed(video.contentUri.toString())
+                                        onPlayMedia(video.contentUri, video.title)
+                                    }
                                 },
-                                onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) }
+                                onLongClick = { viewModel.enterSelectionModeWithVideo(video.id) },
+                                isSelected = isSelected,
+                                onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(video)) },
+                                onDelete = { videoToDelete = video }
                             )
                         }
                     }
@@ -998,21 +1137,34 @@ fun HomeScreen(
                             when (item) {
                                 is GridCardItem.Video -> {
                                     val isFav = item.item.contentUri.toString() in uiState.favoriteUris
+                                    val isSelected = item.item.id in uiState.selectedVideoIds
                                     if (uiState.isListView) {
                                         RealVideoListCard(
                                             video = item.item,
                                             isFavorite = isFav,
-                                            onClick = { onPlayMedia(item.item.contentUri, item.item.title) },
+                                            isSelected = isSelected,
+                                            onClick = {
+                                                if (uiState.isSelectionMode) viewModel.toggleVideoSelection(item.item.id)
+                                                else onPlayMedia(item.item.contentUri, item.item.title)
+                                            },
+                                            onLongClick = { viewModel.enterSelectionModeWithVideo(item.item.id) },
                                             onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(item.item)) },
-                                            onToggleFavorite = { viewModel.toggleFavorite(item.item.contentUri.toString()) }
+                                            onToggleFavorite = { viewModel.toggleFavorite(item.item.contentUri.toString()) },
+                                            onDelete = { videoToDelete = item.item }
                                         )
                                     } else {
                                         RealVideoCard(
                                             video = item.item,
                                             isFavorite = isFav,
-                                            onClick = { onPlayMedia(item.item.contentUri, item.item.title) },
+                                            isSelected = isSelected,
+                                            onClick = {
+                                                if (uiState.isSelectionMode) viewModel.toggleVideoSelection(item.item.id)
+                                                else onPlayMedia(item.item.contentUri, item.item.title)
+                                            },
+                                            onLongClick = { viewModel.enterSelectionModeWithVideo(item.item.id) },
                                             onAddToPlaylist = { playlistViewModel.openAddToPlaylistDialog(listOf(item.item)) },
-                                            onToggleFavorite = { viewModel.toggleFavorite(item.item.contentUri.toString()) }
+                                            onToggleFavorite = { viewModel.toggleFavorite(item.item.contentUri.toString()) },
+                                            onDelete = { videoToDelete = item.item }
                                         )
                                     }
                                 }
@@ -1079,6 +1231,72 @@ fun HomeScreen(
         )
     }
 
+
+    // Single Video Delete Confirmation Dialog
+    videoToDelete?.let { video ->
+        AlertDialog(
+            onDismissRequest = { videoToDelete = null },
+            containerColor = FalconSurface,
+            title = {
+                Text("Delete Video?", color = FalconTextPrimary, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "\"${video.title}\" will be permanently deleted from your device. This cannot be undone.",
+                    color = FalconTextSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.deleteVideo(video); videoToDelete = null }) {
+                    Text("Delete", color = FalconRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { videoToDelete = null }) {
+                    Text("Cancel", color = FalconTextSecondary)
+                }
+            }
+        )
+    }
+
+    // Bulk Delete Confirmation Dialog
+    val selectionCount = uiState.selectedVideoIds.size
+    if (showBulkDeleteDialog && selectionCount > 0) {
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteDialog = false },
+            containerColor = FalconSurface,
+            title = {
+                Text(
+                    "Delete $selectionCount ${if (selectionCount == 1) "video" else "videos"}?",
+                    color = FalconTextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    "${if (selectionCount == 1) "This file" else "These $selectionCount files"} will be permanently deleted from your device storage. This cannot be undone.",
+                    color = FalconTextSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBulkDeleteDialog = false
+                        viewModel.deleteSelectedVideos()
+                    }
+                ) {
+                    Text("Delete", color = FalconRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBulkDeleteDialog = false }) {
+                    Text("Cancel", color = FalconTextSecondary)
+                }
+            }
+        )
+    }
     if (audioUiState.showPlayerSheet && audioPlaybackState.currentTrack != null) {
         AudioPlayerSheet(
             sheetState = audioSheetState,
@@ -1097,6 +1315,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RealVideoCard(
     video: VideoItem,
@@ -1104,6 +1323,9 @@ fun RealVideoCard(
     onAddToPlaylist: () -> Unit,
     isFavorite: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    isSelected: Boolean = false,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -1111,7 +1333,10 @@ fun RealVideoCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
     ) {
         Box(
             modifier = Modifier
@@ -1119,6 +1344,10 @@ fun RealVideoCard(
                 .aspectRatio(1.6f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(FalconSurface)
+                .then(
+                    if (isSelected) Modifier.border(2.dp, FalconRed, RoundedCornerShape(8.dp))
+                    else Modifier
+                )
         ) {
             VideoThumbnailImage(
                 videoUri = video.contentUri,
@@ -1143,61 +1372,93 @@ fun RealVideoCard(
                 }
             }
 
-            // Top Right 3-dots Menu Button
-            Box(
-                modifier = Modifier
-                    .padding(4.dp)
-                    .align(Alignment.TopEnd)
-            ) {
+            if (isSelected) {
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                        .clickable { showMenu = true },
+                        .fillMaxSize()
+                        .background(FalconRed.copy(alpha = 0.4f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Item Menu",
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Selected",
                         tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
-
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(FalconSurface)
+            } else {
+                // Top Right 3-dots Menu Button
+                Box(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .align(Alignment.TopEnd)
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("Add to Playlist", color = FalconTextPrimary) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                                contentDescription = null,
-                                tint = FalconRed
-                            )
-                        },
-                        onClick = {
-                            showMenu = false
-                            onAddToPlaylist()
-                        }
-                    )
-                    onToggleFavorite?.let { toggleFav ->
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                            .clickable { showMenu = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Item Menu",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(FalconSurface)
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(if (isFavorite) "Remove Favorite" else "Add to Favorites", color = FalconTextPrimary) },
+                            text = { Text("Add to Playlist", color = FalconTextPrimary) },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                                     contentDescription = null,
                                     tint = FalconRed
                                 )
                             },
                             onClick = {
                                 showMenu = false
-                                toggleFav()
+                                onAddToPlaylist()
                             }
                         )
+                        onToggleFavorite?.let { toggleFav ->
+                            DropdownMenuItem(
+                                text = { Text(if (isFavorite) "Remove Favorite" else "Add to Favorites", color = FalconTextPrimary) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = FalconRed
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    toggleFav()
+                                }
+                            )
+                        }
+                        onDelete?.let { doDelete ->
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = FalconRed) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = FalconRed
+                                    )
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    doDelete()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1238,6 +1499,7 @@ fun RealVideoCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RealVideoListCard(
     video: VideoItem,
@@ -1245,6 +1507,9 @@ fun RealVideoListCard(
     onClick: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+    isSelected: Boolean = false,
+    onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -1260,7 +1525,9 @@ fun RealVideoListCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) FalconRed.copy(alpha = 0.15f) else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 6.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1276,6 +1543,22 @@ fun RealVideoListCard(
                 contentDescription = video.title,
                 modifier = Modifier.fillMaxSize()
             )
+
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(FalconRed.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Selected",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.width(14.dp))
@@ -1300,47 +1583,73 @@ fun RealVideoListCard(
             )
         }
 
-        Box {
-            IconButton(onClick = { showMenu = true }) {
+        if (isSelected) {
+            IconButton(onClick = onClick) {
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Options",
-                    tint = FalconTextPrimary
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = FalconRed
                 )
             }
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false },
-                modifier = Modifier.background(FalconSurface)
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Add to Playlist", color = FalconTextPrimary) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                            contentDescription = null,
-                            tint = FalconRed
+        } else {
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Options",
+                        tint = FalconTextPrimary
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false },
+                    modifier = Modifier.background(FalconSurface)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Add to Playlist", color = FalconTextPrimary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                                contentDescription = null,
+                                tint = FalconRed
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onAddToPlaylist()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (isFavorite) "Remove Favorite" else "Add to Favorites", color = FalconTextPrimary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = FalconRed
+                            )
+                        },
+                        onClick = {
+                            showMenu = false
+                            onToggleFavorite()
+                        }
+                    )
+                    onDelete?.let { doDelete ->
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = FalconRed) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = FalconRed
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                doDelete()
+                            }
                         )
-                    },
-                    onClick = {
-                        showMenu = false
-                        onAddToPlaylist()
                     }
-                )
-                DropdownMenuItem(
-                    text = { Text(if (isFavorite) "Remove Favorite" else "Add to Favorites", color = FalconTextPrimary) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            tint = FalconRed
-                        )
-                    },
-                    onClick = {
-                        showMenu = false
-                        onToggleFavorite()
-                    }
-                )
+                }
             }
         }
     }

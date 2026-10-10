@@ -2,6 +2,9 @@ package com.example.falconplayer.data
 
 import android.content.ContentUris
 import android.content.Context
+import android.content.IntentSender
+import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -121,5 +124,93 @@ class VideoRepository @Inject constructor(
                 )
             }
             .sortedByDescending { it.videoCount }
+    }
+
+    /**
+     * Deletes a video from device storage using scoped storage APIs.
+     * On Android Q+, returns [DeleteResult.NeedsPermission] with an IntentSender
+     * that the Activity must launch to request OS-level delete permission.
+     * On older Android, deletes directly.
+     */
+    suspend fun deleteVideo(videoUri: Uri): DeleteResult = withContext(Dispatchers.IO) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Android 11+ — createDeleteRequest grants permission and deletes atomically
+                val intentSender = MediaStore.createDeleteRequest(
+                    context.contentResolver,
+                    listOf(videoUri)
+                ).intentSender
+                DeleteResult.NeedsPermission(intentSender)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10 — try direct delete; may throw RecoverableSecurityException
+                try {
+                    val deleted = context.contentResolver.delete(videoUri, null, null)
+                    if (deleted > 0) DeleteResult.Success else DeleteResult.Failure("File not found or already deleted")
+                } catch (e: android.app.RecoverableSecurityException) {
+                    DeleteResult.NeedsPermission(e.userAction.actionIntent.intentSender)
+                }
+            } else {
+                // Android 9 and below — direct delete
+                val deleted = context.contentResolver.delete(videoUri, null, null)
+                if (deleted > 0) DeleteResult.Success else DeleteResult.Failure("File not found or already deleted")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting video $videoUri", e)
+            DeleteResult.Failure(e.localizedMessage ?: "Unknown error")
+        }
+    }
+
+    /**
+     * Bulk delete multiple videos. On Android 11+ a single system dialog covers all.
+     * On older Android, deletes each individually and collects failures.
+     */
+    suspend fun deleteVideos(uris: List<Uri>): BulkDeleteResult = withContext(Dispatchers.IO) {
+        if (uris.isEmpty()) return@withContext BulkDeleteResult(emptyList(), emptyList())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // One request, one dialog, all deleted atomically
+                val intentSender = MediaStore.createDeleteRequest(
+                    context.contentResolver,
+                    uris
+                ).intentSender
+                BulkDeleteResult(emptyList(), emptyList(), needsPermissionSender = intentSender)
+            } else {
+                val deleted = mutableListOf<Uri>()
+                val failed = mutableListOf<Pair<Uri, String>>()
+                for (uri in uris) {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            try {
+                                val count = context.contentResolver.delete(uri, null, null)
+                                if (count > 0) deleted.add(uri) else failed.add(uri to "Not found")
+                            } catch (e: android.app.RecoverableSecurityException) {
+                                failed.add(uri to "Permission denied")
+                            }
+                        } else {
+                            val count = context.contentResolver.delete(uri, null, null)
+                            if (count > 0) deleted.add(uri) else failed.add(uri to "Not found")
+                        }
+                    } catch (e: Exception) {
+                        failed.add(uri to (e.localizedMessage ?: "Unknown error"))
+                    }
+                }
+                BulkDeleteResult(deleted, failed)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error bulk deleting videos", e)
+            BulkDeleteResult(emptyList(), uris.map { it to (e.localizedMessage ?: "Error") })
+        }
+    }
+
+    data class BulkDeleteResult(
+        val deleted: List<Uri>,
+        val failed: List<Pair<Uri, String>>,
+        val needsPermissionSender: IntentSender? = null
+    )
+
+    sealed interface DeleteResult {
+        object Success : DeleteResult
+        data class NeedsPermission(val intentSender: IntentSender) : DeleteResult
+        data class Failure(val reason: String) : DeleteResult
     }
 }

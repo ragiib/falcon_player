@@ -1,6 +1,5 @@
 package com.example.falconplayer.ui.home
 
-import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
@@ -39,8 +37,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,12 +70,11 @@ fun MoreScreen(
     onToggleIncognitoMode: () -> Unit,
     onRefresh: () -> Unit,
     onOpenHistory: () -> Unit,
-    onPlayMedia: (uri: Uri?, title: String?) -> Unit,
+    onPlayMedia: (uri: android.net.Uri?, title: String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showDropdown by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
-    var showNewStreamDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -242,64 +237,7 @@ fun MoreScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3. Streams Section
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showNewStreamDialog = true }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Streams",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FalconRed
-                )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Streams",
-                    tint = FalconRed
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 4.dp, bottom = 16.dp)
-                    .width(160.dp)
-                    .height(110.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(FalconSurface)
-                    .border(1.dp, FalconSurfaceVariant, RoundedCornerShape(8.dp))
-                    .clickable { showNewStreamDialog = true },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "New stream",
-                        tint = FalconRed,
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "New stream",
-                        color = FalconTextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // 4. History Section
+        // 3. History Section
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
@@ -395,59 +333,6 @@ fun MoreScreen(
     }
 
     // DIALOGS
-    if (showNewStreamDialog) {
-        var streamUrl by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showNewStreamDialog = false },
-            containerColor = FalconSurface,
-            title = {
-                Text("Open Network Stream", color = FalconTextPrimary, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Column {
-                    Text(
-                        "Enter network stream URL (e.g. http, rtsp, m3u8):",
-                        color = FalconTextSecondary,
-                        fontSize = 14.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = streamUrl,
-                        onValueChange = { streamUrl = it },
-                        placeholder = { Text("http://example.com/stream.mp4", color = FalconTextSecondary) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = FalconTextPrimary,
-                            unfocusedTextColor = FalconTextPrimary,
-                            focusedBorderColor = FalconRed,
-                            unfocusedBorderColor = FalconSurfaceVariant,
-                            cursorColor = FalconRed
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (streamUrl.isNotBlank()) {
-                            showNewStreamDialog = false
-                            onPlayMedia(Uri.parse(streamUrl.trim()), "Network Stream")
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = FalconRed)
-                ) {
-                    Text("Play", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNewStreamDialog = false }) {
-                    Text("Cancel", color = FalconTextSecondary)
-                }
-            }
-        )
-    }
-
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },

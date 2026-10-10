@@ -53,6 +53,10 @@ class PlayerViewModel @Inject constructor(
     private var resizeMessageJob: Job? = null
     private var currentUri: String? = null
 
+    // Accumulating double-tap seek state
+    private var doubleTapSeekAccumulatedMs: Long = 0L
+    private var doubleTapLastIsForward: Boolean? = null
+
     private var playlistQueue: List<VideoItem> = emptyList()
     private var currentQueueIndex: Int = 0
 
@@ -555,25 +559,51 @@ class PlayerViewModel @Inject constructor(
         onUserActivity()
     }
 
-    fun triggerDoubleTapSeek(isForward: Boolean) {
-        if (isForward) {
-            onForwardClick()
-        } else {
-            onRewindClick()
+    fun onScreenTap(tapX: Float, screenWidth: Float) {
+        val currentFeedback = _uiState.value.seekFeedback
+        if (currentFeedback != null) {
+            if (!currentFeedback.isForward && tapX < screenWidth * 0.45f) {
+                triggerDoubleTapSeek(isForward = false)
+                return
+            } else if (currentFeedback.isForward && tapX > screenWidth * 0.55f) {
+                triggerDoubleTapSeek(isForward = true)
+                return
+            }
         }
+        onControlsScreenTap()
+    }
+
+    fun triggerDoubleTapSeek(isForward: Boolean) {
+        // Reset accumulation if direction changed
+        if (doubleTapLastIsForward != isForward) {
+            doubleTapSeekAccumulatedMs = 0L
+        }
+        doubleTapLastIsForward = isForward
+        doubleTapSeekAccumulatedMs += 10_000L
+
+        val seekDeltaMs = if (isForward) 10_000L else -10_000L
+        val target = (player.currentPosition + seekDeltaMs).coerceIn(0L, player.duration.coerceAtLeast(0L))
+        player.seekTo(target)
+        updateMediaInfo()
+        onUserActivity()
+
+        val totalSeconds = (doubleTapSeekAccumulatedMs / 1000L).toInt()
         _uiState.update {
             it.copy(
                 seekFeedback = SeekFeedback(
                     isForward = isForward,
-                    amountSeconds = 10,
+                    amountSeconds = totalSeconds,
                     timestamp = System.currentTimeMillis()
                 )
             )
         }
         seekFeedbackJob?.cancel()
         seekFeedbackJob = viewModelScope.launch {
-            delay(650L)
+            delay(900L)
             _uiState.update { it.copy(seekFeedback = null) }
+            // Reset accumulation after the interaction window closes
+            doubleTapSeekAccumulatedMs = 0L
+            doubleTapLastIsForward = null
         }
     }
 

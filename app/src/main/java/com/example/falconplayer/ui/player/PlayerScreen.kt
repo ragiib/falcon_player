@@ -73,6 +73,7 @@ import com.example.falconplayer.ui.player.components.PlayerControls
 import com.example.falconplayer.ui.player.components.PlayerSettingsSheet
 import com.example.falconplayer.ui.player.components.TrackSelectionSheet
 import com.example.falconplayer.ui.player.components.VideoInfoDialog
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -103,8 +104,19 @@ fun PlayerScreen(
     var hudJob by remember { mutableStateOf<Job?>(null) }
 
     val handleBack = {
+        // Always reset orientation when leaving the player
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         viewModel.stopPlayback()
         onBackClick()
+    }
+
+    // Reset orientation to portrait/unspecified whenever this screen leaves composition
+    DisposableEffect(Unit) {
+        onDispose {
+            val activity = context as? Activity
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
     }
 
     // Intercept back button when sheets or dialogs are visible
@@ -273,8 +285,8 @@ fun PlayerScreen(
                                 viewModel.onPlayPauseClick()
                             }
                         },
-                        onTap = {
-                            viewModel.onControlsScreenTap()
+                        onTap = { offset ->
+                            viewModel.onScreenTap(offset.x, size.width.toFloat())
                         }
                     )
                 }
@@ -462,7 +474,7 @@ fun PlayerScreen(
             onSeek = viewModel::onSeek,
             onLockToggle = viewModel::onLockToggle,
             onFullscreenToggle = {
-                val activity = context as? MainActivity
+                val activity = context as? Activity
                 if (activity != null) {
                     val isLandscape = activity.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     activity.requestedOrientation = if (isLandscape) {
@@ -470,6 +482,7 @@ fun PlayerScreen(
                     } else {
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     }
+                    viewModel.toggleFullscreen()
                 }
             }
         )

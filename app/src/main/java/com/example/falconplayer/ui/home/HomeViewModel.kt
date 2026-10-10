@@ -1,5 +1,6 @@
 package com.example.falconplayer.ui.home
 
+import android.content.IntentSender
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,7 @@ import com.example.falconplayer.data.SortType
 import com.example.falconplayer.data.VideoItem
 import com.example.falconplayer.data.VideoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,7 +39,10 @@ data class HomeUiState(
     val playbackAction: String = "Play",
     val sortType: SortType = SortType.NAME_ASC,
     val favoriteUris: List<String> = emptyList(),
-    val showDisplaySettingsScreen: Boolean = false
+    val showDisplaySettingsScreen: Boolean = false,
+    // Multi-selection
+    val isSelectionMode: Boolean = false,
+    val selectedVideoIds: Set<Long> = emptySet()
 ) {
     val filteredVideos: List<VideoItem>
         get() {
@@ -99,6 +104,15 @@ class HomeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    // Events for delete: either NeedsPermission (IntentSender) or failure message
+    val deleteIntentSender = MutableSharedFlow<Pair<IntentSender, Uri>>(extraBufferCapacity = 1)
+    val deleteErrorMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    // Bulk delete events
+    // Carries the IntentSender for Android 11+ bulk delete + the URIs being deleted
+    val bulkDeleteIntentSender = MutableSharedFlow<Pair<IntentSender, List<Uri>>>(extraBufferCapacity = 1)
+    val bulkDeleteErrorMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
 
     init {
         observeHistory()
@@ -325,6 +339,129 @@ class HomeViewModel @Inject constructor(
     fun onSearchQueryChange(query: String) {
         _uiState.update {
             it.copy(searchQuery = query)
+        }
+    }
+
+    fun deleteVideo(video: VideoItem) {
+        viewModelScope.launch {
+            when (val result = videoRepository.deleteVideo(video.contentUri)) {
+                is VideoRepository.DeleteResult.Success -> {
+                    // Remove immediately from UI state
+                    _uiState.update { state ->
+                        state.copy(
+                            videos = state.videos.filter { it.id != video.id },
+                            folders = videoRepository.getFolders(state.videos.filter { it.id != video.id })
+                        )
+                    }
+                }
+                is VideoRepository.DeleteResult.NeedsPermission -> {
+                    // Android Q+: need to launch OS-level permission dialog
+                    // Store the video URI so we can remove it after permission is granted
+                    deleteIntentSender.emit(Pair(result.intentSender, video.contentUri))
+                }
+                is VideoRepository.DeleteResult.Failure -> {
+                    deleteErrorMessage.emit(result.reason)
+                }
+            }
+        }
+    }
+
+    fun onVideoDeletedAfterPermission(videoUri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { state ->
+                val remaining = state.videos.filter { it.contentUri != videoUri }
+                state.copy(
+                    videos = remaining,
+                    folders = videoRepository.getFolders(remaining)
+                )
+            }
+            loadMedia()
+        }
+    }
+
+    // ---- Multi-selection ----
+
+    fun toggleSelectionMode() {
+        _uiState.update { it.copy(isSelectionMode = !it.isSelectionMode, selectedVideoIds = emptySet()) }
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(isSelectionMode = false, selectedVideoIds = emptySet()) }
+    }
+
+    fun enterSelectionModeWithVideo(videoId: Long) {
+        _uiState.update {
+            it.copy(
+                isSelectionMode = true,
+                selectedVideoIds = setOf(videoId)
+            )
+        }
+    }
+
+    fun toggleVideoSelection(videoId: Long) {
+        _uiState.update { state ->
+            val current = state.selectedVideoIds
+            val updated = if (videoId in current) current - videoId else current + videoId
+            state.copy(
+                selectedVideoIds = updated,
+                isSelectionMode = updated.isNotEmpty()
+            )
+        }
+    }
+
+    fun deleteSelectedVideos() {
+        val state = _uiState.value
+        val selectedIds = state.selectedVideoIds
+        if (selectedIds.isEmpty()) return
+
+        val selectedVideos = state.videos.filter { it.id in selectedIds }
+        val uris = selectedVideos.map { it.contentUri }
+
+        viewModelScope.launch {
+            val result = videoRepository.deleteVideos(uris)
+            when {
+                result.needsPermissionSender != null -> {
+                    // Android 11+: single OS dialog for all
+                    bulkDeleteIntentSender.emit(Pair(result.needsPermissionSender, uris))
+                }
+                else -> {
+                    // Pre-Android 11: remove successfully deleted immediately
+                    val deletedUris = result.deleted.toSet()
+                    if (deletedUris.isNotEmpty()) {
+                        _uiState.update { s ->
+                            val remaining = s.videos.filter { it.contentUri !in deletedUris }
+                            s.copy(
+                                videos = remaining,
+                                folders = videoRepository.getFolders(remaining),
+                                isSelectionMode = false,
+                                selectedVideoIds = emptySet()
+                            )
+                        }
+                    }
+                    if (result.failed.isNotEmpty()) {
+                        val msg = "${result.failed.size} file(s) could not be deleted."
+                        bulkDeleteErrorMessage.emit(msg)
+                    } else {
+                        _uiState.update { it.copy(isSelectionMode = false, selectedVideoIds = emptySet()) }
+                    }
+                }
+            }
+        }
+    }
+
+    fun onBulkDeletedAfterPermission(uris: List<Uri>) {
+        viewModelScope.launch {
+            val uriSet = uris.toSet()
+            _uiState.update { s ->
+                val remaining = s.videos.filter { it.contentUri !in uriSet }
+                s.copy(
+                    videos = remaining,
+                    folders = videoRepository.getFolders(remaining),
+                    isSelectionMode = false,
+                    selectedVideoIds = emptySet()
+                )
+            }
+            loadMedia()
         }
     }
 }

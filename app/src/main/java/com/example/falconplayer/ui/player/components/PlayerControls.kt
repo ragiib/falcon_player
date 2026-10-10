@@ -133,7 +133,7 @@ fun PlayerControls(
                         onLockToggle = onLockToggle,
                         onSpeedClick = onSpeedClick,
                         onFullscreenToggle = onFullscreenToggle,
-                        modifier = Modifier.padding(bottom = 20.dp)
+                        modifier = Modifier.padding(bottom = 32.dp)
                     )
                 }
             }
